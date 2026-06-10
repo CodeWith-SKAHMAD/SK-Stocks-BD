@@ -1,0 +1,24 @@
+{
+  "name": "BD Stock Tracker",
+  "short_name": "BD Stocks",
+  "description": "বাংলাদেশ স্টক ইনভেস্টমেন্ট ট্র্যাকার",
+  "start_url": "/SK-Stocks-BD/",
+  "display": "standalone",
+  "background_color": "#080c14",
+  "theme_color": "#00e5b4",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/SK-Stocks-BD/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/SK-Stocks-BD/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
