@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { DSE_STOCKS, CSE_STOCKS } from '../lib/utils'
-import { X } from 'lucide-react'
+import { X, Info } from 'lucide-react'
 
 export default function AddTransactionModal({ onClose, prefill }) {
   const [type, setType] = useState(prefill?.type || 'BUY')
@@ -13,6 +13,7 @@ export default function AddTransactionModal({ onClose, prefill }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const [holdings, setHoldings] = useState({}) // {stockName: availableQty}
 
   const stocks = exchange === 'DSE' ? DSE_STOCKS : CSE_STOCKS
   const filtered = stocks.filter(s =>
@@ -21,18 +22,33 @@ export default function AddTransactionModal({ onClose, prefill }) {
   ).slice(0, 6)
 
   const totalCost = quantity && price ? (Number(quantity) * Number(price)) : 0
+  const availableQty = holdings[stockName] || 0
+
+  useEffect(() => { fetchHoldings() }, [])
+
+  async function fetchHoldings() {
+    const { data } = await supabase.from('transactions').select('stock_name, quantity, type')
+    if (!data) return
+    const map = {}
+    data.forEach(t => {
+      if (!map[t.stock_name]) map[t.stock_name] = 0
+      if (t.type === 'BUY') map[t.stock_name] += Number(t.quantity)
+      else map[t.stock_name] -= Number(t.quantity)
+    })
+    setHoldings(map)
+  }
 
   async function handleSubmit() {
     if (!stockName || !quantity || !price || !date) { setError('সব তথ্য পূরণ করুন'); return }
+    if (type === 'SELL' && Number(quantity) > availableQty) {
+      setError(`আপনার কাছে মাত্র ${availableQty}টি ${stockName} শেয়ার আছে!`)
+      return
+    }
     setLoading(true); setError('')
-
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setError('লগইন করুন'); setLoading(false); return }
-
     const { error: err } = await supabase.from('transactions').insert({
-      user_id: user.id,
-      type,
-      exchange,
+      user_id: user.id, type, exchange,
       stock_name: stockName,
       quantity: Number(quantity),
       price: Number(price),
@@ -50,7 +66,6 @@ export default function AddTransactionModal({ onClose, prefill }) {
           <h3 style={{ fontSize: 17, fontWeight: 800 }}>ট্রানজেকশন যোগ করুন</h3>
           <button className="icon-btn" onClick={onClose}><X size={16} /></button>
         </div>
-
         <div className="modal-body">
           {/* BUY/SELL */}
           <div style={{ display: 'flex', gap: 10, marginBottom: 18 }}>
@@ -81,12 +96,12 @@ export default function AddTransactionModal({ onClose, prefill }) {
             <input className="form-input" type="date" value={date} onChange={e => setDate(e.target.value)} />
           </div>
 
-          {/* Stock Name with autocomplete */}
+          {/* Stock Name */}
           <div className="form-group" style={{ position: 'relative' }}>
             <label className="form-label">স্টকের নাম / কোড</label>
             <input className="form-input" placeholder="যেমন: BRACBANK..."
               value={stockName}
-              onChange={e => { setStockName(e.target.value); setShowSuggestions(true) }}
+              onChange={e => { setStockName(e.target.value.toUpperCase()); setShowSuggestions(true) }}
               onFocus={() => setShowSuggestions(true)}
               onBlur={() => setTimeout(() => setShowSuggestions(false), 200)} />
             {showSuggestions && stockName && filtered.length > 0 && (
@@ -104,11 +119,31 @@ export default function AddTransactionModal({ onClose, prefill }) {
             )}
           </div>
 
+          {/* Available shares info for SELL */}
+          {type === 'SELL' && stockName && (
+            <div style={{
+              background: availableQty > 0 ? 'rgba(0,229,180,0.08)' : 'rgba(239,68,68,0.08)',
+              border: `1px solid ${availableQty > 0 ? 'rgba(0,229,180,0.2)' : 'rgba(239,68,68,0.2)'}`,
+              borderRadius: 'var(--radius-xs)', padding: '10px 14px', marginBottom: 14,
+              display: 'flex', alignItems: 'center', gap: 8
+            }}>
+              <Info size={14} style={{ color: availableQty > 0 ? 'var(--accent)' : 'var(--red)', flexShrink: 0 }} />
+              <div>
+                <span style={{ fontSize: 13, color: 'var(--text2)' }}>{stockName} — হাতে আছে: </span>
+                <span style={{ fontSize: 15, fontWeight: 800, color: availableQty > 0 ? 'var(--accent)' : 'var(--red)' }}>
+                  {availableQty} শেয়ার
+                </span>
+                {availableQty === 0 && <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 2 }}>এই স্টক আপনার কাছে নেই!</div>}
+              </div>
+            </div>
+          )}
+
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">শেয়ার সংখ্যা</label>
-              <input className="form-input" type="number" placeholder="যেমন: 100"
-                value={quantity} onChange={e => setQuantity(e.target.value)} min="1" />
+              <label className="form-label">শেয়ার সংখ্যা {type === 'SELL' && availableQty > 0 && <span style={{ color: 'var(--accent)', fontSize: 10 }}>(সর্বোচ্চ {availableQty})</span>}</label>
+              <input className="form-input" type="number" placeholder="যেমন: 50"
+                value={quantity} onChange={e => setQuantity(e.target.value)}
+                min="1" max={type === 'SELL' ? availableQty : undefined} />
             </div>
             <div className="form-group">
               <label className="form-label">{type === 'BUY' ? 'কেনার দাম' : 'বেচার দাম'} (৳)</label>
@@ -117,7 +152,7 @@ export default function AddTransactionModal({ onClose, prefill }) {
             </div>
           </div>
 
-          {/* Total Cost */}
+          {/* Total */}
           <div style={{ background: `rgba(${type === 'BUY' ? '0,229,180' : '239,68,68'},0.08)`, border: `1px solid rgba(${type === 'BUY' ? '0,229,180' : '239,68,68'},0.2)`, borderRadius: 'var(--radius-xs)', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 13, color: 'var(--text2)' }}>মোট {type === 'BUY' ? 'খরচ' : 'আয়'}</span>
             <span style={{ fontSize: 20, fontWeight: 800, color: type === 'BUY' ? 'var(--accent)' : 'var(--red)' }}>
@@ -125,7 +160,19 @@ export default function AddTransactionModal({ onClose, prefill }) {
             </span>
           </div>
 
-          {error && <div style={{ color: 'var(--red)', fontSize: 13, marginTop: 10 }}>⚠️ {error}</div>}
+          {/* Profit preview for SELL */}
+          {type === 'SELL' && stockName && quantity && price && availableQty > 0 && holdings[stockName] > 0 && (
+            <div style={{ marginTop: 10, padding: '10px 14px', background: 'var(--bg3)', borderRadius: 'var(--radius-xs)', fontSize: 13 }}>
+              {(() => {
+                // avg buy price হিসাব (simplified)
+                const sellTotal = Number(quantity) * Number(price)
+                const note = `${quantity} শেয়ার × ৳${price} = ৳${sellTotal.toLocaleString()}`
+                return <span style={{ color: 'var(--text2)' }}>💡 {note}</span>
+              })()}
+            </div>
+          )}
+
+          {error && <div style={{ color: 'var(--red)', fontSize: 13, marginTop: 10, padding: '8px 12px', background: 'rgba(239,68,68,0.08)', borderRadius: 6 }}>⚠️ {error}</div>}
         </div>
 
         <div className="modal-footer">
