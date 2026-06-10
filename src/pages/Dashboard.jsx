@@ -62,7 +62,14 @@ export default function Dashboard({ onNavigate }) {
   const [period, setPeriod] = useState('weekly')
   const market = getMarketStatus()
 
-  useEffect(() => { fetchTransactions() }, [])
+  useEffect(() => {
+    fetchTransactions()
+    const channel = supabase
+      .channel("transactions-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "transactions" }, () => { fetchTransactions() })
+      .subscribe()
+    return () => supabase.removeChannel(channel)
+  }, [])
 
   async function fetchTransactions() {
     const { data } = await supabase.from('transactions').select('*').order('date', { ascending: true })

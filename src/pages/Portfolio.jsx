@@ -14,7 +14,14 @@ export default function Portfolio() {
   const [editId, setEditId] = useState(null)
   const [editData, setEditData] = useState({})
 
-  useEffect(() => { fetchAll() }, [])
+  useEffect(() => {
+    fetchAll()
+    const channel = supabase
+      .channel("portfolio-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "transactions" }, () => { fetchAll() })
+      .subscribe()
+    return () => supabase.removeChannel(channel)
+  }, [])
 
   async function fetchAll() {
     const { data } = await supabase.from('transactions').select('*').order('date', { ascending: false })
