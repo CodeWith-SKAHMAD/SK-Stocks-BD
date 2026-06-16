@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { formatTaka } from '../lib/utils'
+import { calcPortfolio } from '../lib/portfolio'
 import { Plus, Search, Edit2, Trash2, X, Check } from 'lucide-react'
 import AddTransactionModal from '../components/AddTransactionModal'
 
@@ -65,6 +66,7 @@ export default function Portfolio() {
 
   const totalInvested = transactions.filter(t=>t.type==='BUY').reduce((s,t)=>s+Number(t.total_cost),0)
   const totalReturned = transactions.filter(t=>t.type==='SELL').reduce((s,t)=>s+Number(t.total_cost),0)
+  const { totalRealizedPL: realizedPL } = calcPortfolio(transactions)
 
   if (loading) return <div className="loading"><div className="spinner" /><span>লোড হচ্ছে...</span></div>
 
@@ -90,12 +92,12 @@ export default function Portfolio() {
           <div className="stat-label">মোট বিক্রয়</div>
           <div className="stat-value">{formatTaka(totalReturned)}</div>
         </div>
-        <div className={`stat-card ${totalReturned - totalInvested >= 0 ? 'green' : 'red'}`}>
-          <div className="stat-label">নিট লাভ/ক্ষতি</div>
-          <div className={`stat-value ${totalReturned - totalInvested >= 0 ? 'profit' : 'loss'}`}>
-            {formatTaka(Math.abs(totalReturned - totalInvested))}
+        <div className={`stat-card ${realizedPL >= 0 ? 'green' : 'red'}`}>
+          <div className="stat-label">Realized P&L</div>
+          <div className={`stat-value ${realizedPL >= 0 ? 'profit' : 'loss'}`}>
+            {realizedPL >= 0 ? '+' : '-'}{formatTaka(Math.abs(realizedPL))}
           </div>
-          <div className="stat-sub">{totalReturned - totalInvested >= 0 ? '✅ লাভে' : '❌ ক্ষতিতে'}</div>
+          <div className="stat-sub">{realizedPL > 0 ? '✅ লাভে' : realizedPL === 0 ? '➡️ নিরপেক্ষ' : '❌ ক্ষতিতে'}</div>
         </div>
         <div className="stat-card yellow">
           <div className="stat-label">মোট ট্রানজেকশন</div>
