@@ -248,6 +248,20 @@ body {
   background: linear-gradient(135deg, #232140 0%, #1c1a30 100%);
   border-color: rgba(129,140,248,0.18);
 }
+.stat-card.blue .stat-value,
+.stat-card.blue .stat-label,
+.stat-card.blue .stat-sub {
+  color: #f2f2f7;
+}
+[data-theme="light"] .stat-card.blue {
+  background: linear-gradient(135deg, #4c46a3 0%, #3730a3 100%);
+  border-color: rgba(99,102,241,0.3);
+}
+[data-theme="light"] .stat-card.blue .stat-value,
+[data-theme="light"] .stat-card.blue .stat-label,
+[data-theme="light"] .stat-card.blue .stat-sub {
+  color: #ffffff;
+}
 .stat-card.green {
   border-color: rgba(52,211,153,0.15);
 }
@@ -606,3 +620,90 @@ tbody tr:last-child td { border-bottom: none; }
 @media (max-width: 480px) {
   .stat-grid { grid-template-columns: 1fr; }
 }
+
+/* ═══════════════════════════════════
+   TRANSACTION MODAL POLISH
+═══════════════════════════════════ */
+.modal {
+  animation: modalIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.tx-type-toggle {
+  display: flex;
+  background: var(--bg3);
+  border-radius: 14px;
+  padding: 4px;
+  gap: 4px;
+}
+.tx-type-btn {
+  flex: 1;
+  padding: 12px;
+  border-radius: 11px;
+  border: none;
+  background: transparent;
+  color: var(--text2);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.tx-type-btn.buy-active {
+  background: var(--green);
+  color: #0e0e12;
+  box-shadow: 0 4px 12px rgba(52,211,153,0.25);
+}
+.tx-type-btn.sell-active {
+  background: var(--red);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(251,113,133,0.25);
+}
+
+.exchange-toggle {
+  display: flex;
+  gap: 8px;
+}
+.exchange-btn {
+  flex: 1;
+  padding: 10px;
+  border-radius: var(--radius-xs);
+  border: 1.5px solid var(--border);
+  background: var(--bg3);
+  color: var(--text2);
+  font-weight: 700;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.exchange-btn.active {
+  border-color: var(--accent);
+  background: rgba(52,211,153,0.08);
+  color: var(--accent);
+}
+
+.tx-total-box {
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: all 0.2s;
+}
+.tx-total-box.buy { background: rgba(52,211,153,0.06); border: 1px solid rgba(52,211,153,0.18); }
+.tx-total-box.sell { background: rgba(251,113,133,0.06); border: 1px solid rgba(251,113,133,0.18); }
+
+.stock-suggestion-item {
+  padding: 10px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+.stock-suggestion-item:hover { background: var(--bg3); }
+.stock-suggestion-item:last-child { border-bottom: none; }
