@@ -707,3 +707,71 @@ tbody tr:last-child td { border-bottom: none; }
 }
 .stock-suggestion-item:hover { background: var(--bg3); }
 .stock-suggestion-item:last-child { border-bottom: none; }
+
+/* ═══════════════════════════════════
+   MOBILE FULL FIT FIX
+═══════════════════════════════════ */
+html, body {
+  overflow-x: hidden;
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .page-content {
+    padding: 12px;
+    width: 100%;
+    overflow-x: hidden;
+  }
+  .stat-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .stat-card {
+    padding: 14px;
+  }
+  .stat-value {
+    font-size: 18px;
+  }
+  .grid-2 {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  table {
+    font-size: 12px;
+  }
+  thead th, tbody td {
+    padding: 8px 8px;
+  }
+  .section-title {
+    font-size: 13.5px;
+  }
+  .card {
+    padding: 14px;
+    border-radius: 14px;
+  }
+  .modal {
+    max-height: 95vh;
+    border-radius: 16px 16px 0 0;
+  }
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .filter-bar {
+    gap: 6px;
+  }
+  .period-tab {
+    padding: 4px 10px;
+    font-size: 11px;
+  }
+  h2 { font-size: 20px !important; }
+}
+
+@media (max-width: 400px) {
+  .stat-grid {
+    grid-template-columns: 1fr;
+  }
+  .topbar {
+    padding: 10px 14px;
+  }
+}
