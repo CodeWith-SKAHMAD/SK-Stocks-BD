@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { DSE_STOCKS, CSE_STOCKS } from '../lib/utils'
-import { X, Info } from 'lucide-react'
+import { X, Info, TrendingUp, TrendingDown, Calendar, Hash, Coins } from 'lucide-react'
 
 export default function AddTransactionModal({ onClose, prefill }) {
   const [type, setType] = useState(prefill?.type || 'BUY')
@@ -13,7 +13,7 @@ export default function AddTransactionModal({ onClose, prefill }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showSuggestions, setShowSuggestions] = useState(false)
-  const [holdings, setHoldings] = useState({}) // {stockName: availableQty}
+  const [holdings, setHoldings] = useState({})
 
   const stocks = exchange === 'DSE' ? DSE_STOCKS : CSE_STOCKS
   const filtered = stocks.filter(s =>
@@ -61,69 +61,79 @@ export default function AddTransactionModal({ onClose, prefill }) {
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal fade-up">
+      <div className="modal">
         <div className="modal-header">
-          <h3 style={{ fontSize: 17, fontWeight: 800 }}>ট্রানজেকশন যোগ করুন</h3>
+          <div>
+            <h3 style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.3px' }}>ট্রানজেকশন যোগ করুন</h3>
+            <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>স্টক কেনা বা বেচার রেকর্ড রাখুন</p>
+          </div>
           <button className="icon-btn" onClick={onClose}><X size={16} /></button>
         </div>
+
         <div className="modal-body">
-          {/* BUY/SELL */}
-          <div style={{ display: 'flex', gap: 10, marginBottom: 18 }}>
-            <button className={`btn btn-buy ${type === 'BUY' ? 'active' : ''}`}
-              style={{ flex: 1, justifyContent: 'center', fontSize: 15, fontWeight: 800 }}
-              onClick={() => setType('BUY')}>📈 কেনা (BUY)</button>
-            <button className={`btn btn-sell ${type === 'SELL' ? 'active' : ''}`}
-              style={{ flex: 1, justifyContent: 'center', fontSize: 15, fontWeight: 800 }}
-              onClick={() => setType('SELL')}>📉 বেচা (SELL)</button>
+          {/* BUY/SELL Pill Toggle */}
+          <div className="tx-type-toggle" style={{ marginBottom: 20 }}>
+            <button
+              className={`tx-type-btn ${type === 'BUY' ? 'buy-active' : ''}`}
+              onClick={() => setType('BUY')}
+            >
+              <TrendingUp size={16} /> কেনা
+            </button>
+            <button
+              className={`tx-type-btn ${type === 'SELL' ? 'sell-active' : ''}`}
+              onClick={() => setType('SELL')}
+            >
+              <TrendingDown size={16} /> বেচা
+            </button>
           </div>
 
           {/* Exchange */}
           <div className="form-group">
             <label className="form-label">এক্সচেঞ্জ</label>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div className="exchange-toggle">
               {['DSE', 'CSE'].map(ex => (
-                <button key={ex} onClick={() => { setExchange(ex); setStockName('') }}
-                  style={{ flex: 1, padding: '8px', borderRadius: 'var(--radius-xs)', border: `1px solid ${exchange === ex ? 'var(--accent)' : 'var(--border)'}`, background: exchange === ex ? 'rgba(0,229,180,0.1)' : 'var(--bg3)', color: exchange === ex ? 'var(--accent)' : 'var(--text2)', cursor: 'pointer', fontWeight: 700, fontSize: 14 }}>
+                <button key={ex} className={`exchange-btn ${exchange === ex ? 'active' : ''}`}
+                  onClick={() => { setExchange(ex); setStockName('') }}>
                   {ex}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Date */}
-          <div className="form-group">
-            <label className="form-label">তারিখ</label>
-            <input className="form-input" type="date" value={date} onChange={e => setDate(e.target.value)} />
-          </div>
+          <div className="form-row">
+            {/* Date */}
+            <div className="form-group">
+              <label className="form-label"><Calendar size={10} style={{ display: 'inline', marginRight: 3 }} />তারিখ</label>
+              <input className="form-input" type="date" value={date} onChange={e => setDate(e.target.value)} />
+            </div>
 
-          {/* Stock Name */}
-          <div className="form-group" style={{ position: 'relative' }}>
-            <label className="form-label">স্টকের নাম / কোড</label>
-            <input className="form-input" placeholder="যেমন: BRACBANK..."
-              value={stockName}
-              onChange={e => { setStockName(e.target.value.toUpperCase()); setShowSuggestions(true) }}
-              onFocus={() => setShowSuggestions(true)}
-              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)} />
-            {showSuggestions && stockName && filtered.length > 0 && (
-              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xs)', zIndex: 100, overflow: 'hidden', boxShadow: 'var(--shadow)' }}>
-                {filtered.map(s => (
-                  <div key={s.code} onMouseDown={() => { setStockName(s.code); setShowSuggestions(false) }}
-                    style={{ padding: '9px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border)' }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bg3)'}
-                    onMouseLeave={e => e.currentTarget.style.background = ''}>
-                    <div style={{ fontWeight: 700, fontSize: 13 }}>{s.code}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text2)' }}>{s.name} · {s.sector}</div>
-                  </div>
-                ))}
-              </div>
-            )}
+            {/* Stock Name */}
+            <div className="form-group" style={{ position: 'relative' }}>
+              <label className="form-label">স্টক কোড</label>
+              <input className="form-input" placeholder="BRACBANK..."
+                value={stockName}
+                onChange={e => { setStockName(e.target.value.toUpperCase()); setShowSuggestions(true) }}
+                onFocus={() => setShowSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)} />
+              {showSuggestions && stockName && filtered.length > 0 && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 'var(--radius-xs)', zIndex: 100, overflow: 'hidden', boxShadow: '0 12px 32px rgba(0,0,0,0.4)', marginTop: 4 }}>
+                  {filtered.map(s => (
+                    <div key={s.code} className="stock-suggestion-item"
+                      onMouseDown={() => { setStockName(s.code); setShowSuggestions(false) }}>
+                      <div style={{ fontWeight: 700, fontSize: 13 }}>{s.code}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text2)' }}>{s.name} · {s.sector}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Available shares info for SELL */}
           {type === 'SELL' && stockName && (
             <div style={{
-              background: availableQty > 0 ? 'rgba(0,229,180,0.08)' : 'rgba(239,68,68,0.08)',
-              border: `1px solid ${availableQty > 0 ? 'rgba(0,229,180,0.2)' : 'rgba(239,68,68,0.2)'}`,
+              background: availableQty > 0 ? 'rgba(52,211,153,0.06)' : 'rgba(251,113,133,0.06)',
+              border: `1px solid ${availableQty > 0 ? 'rgba(52,211,153,0.18)' : 'rgba(251,113,133,0.18)'}`,
               borderRadius: 'var(--radius-xs)', padding: '10px 14px', marginBottom: 14,
               display: 'flex', alignItems: 'center', gap: 8
             }}>
@@ -140,39 +150,34 @@ export default function AddTransactionModal({ onClose, prefill }) {
 
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">শেয়ার সংখ্যা {type === 'SELL' && availableQty > 0 && <span style={{ color: 'var(--accent)', fontSize: 10 }}>(সর্বোচ্চ {availableQty})</span>}</label>
-              <input className="form-input" type="number" placeholder="যেমন: 50"
+              <label className="form-label">
+                <Hash size={10} style={{ display: 'inline', marginRight: 3 }} />
+                শেয়ার সংখ্যা {type === 'SELL' && availableQty > 0 && <span style={{ color: 'var(--accent)', fontSize: 10 }}>(সর্বোচ্চ {availableQty})</span>}
+              </label>
+              <input className="form-input" type="number" placeholder="50"
                 value={quantity} onChange={e => setQuantity(e.target.value)}
                 min="1" max={type === 'SELL' ? availableQty : undefined} />
             </div>
             <div className="form-group">
-              <label className="form-label">{type === 'BUY' ? 'কেনার দাম' : 'বেচার দাম'} (৳)</label>
-              <input className="form-input" type="number" placeholder="যেমন: 67.50"
+              <label className="form-label"><Coins size={10} style={{ display: 'inline', marginRight: 3 }} />{type === 'BUY' ? 'কেনার দাম' : 'বেচার দাম'} (৳)</label>
+              <input className="form-input" type="number" placeholder="67.50"
                 value={price} onChange={e => setPrice(e.target.value)} step="0.01" />
             </div>
           </div>
 
           {/* Total */}
-          <div style={{ background: `rgba(${type === 'BUY' ? '0,229,180' : '239,68,68'},0.08)`, border: `1px solid rgba(${type === 'BUY' ? '0,229,180' : '239,68,68'},0.2)`, borderRadius: 'var(--radius-xs)', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 13, color: 'var(--text2)' }}>মোট {type === 'BUY' ? 'খরচ' : 'আয়'}</span>
-            <span style={{ fontSize: 20, fontWeight: 800, color: type === 'BUY' ? 'var(--accent)' : 'var(--red)' }}>
+          <div className={`tx-total-box ${type === 'BUY' ? 'buy' : 'sell'}`}>
+            <span style={{ fontSize: 13, color: 'var(--text2)', fontWeight: 600 }}>মোট {type === 'BUY' ? 'খরচ' : 'আয়'}</span>
+            <span style={{ fontSize: 22, fontWeight: 800, color: type === 'BUY' ? 'var(--accent)' : 'var(--red)', letterSpacing: '-0.5px' }}>
               ৳{totalCost.toLocaleString('en-BD', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
 
-          {/* Profit preview for SELL */}
-          {type === 'SELL' && stockName && quantity && price && availableQty > 0 && holdings[stockName] > 0 && (
-            <div style={{ marginTop: 10, padding: '10px 14px', background: 'var(--bg3)', borderRadius: 'var(--radius-xs)', fontSize: 13 }}>
-              {(() => {
-                // avg buy price হিসাব (simplified)
-                const sellTotal = Number(quantity) * Number(price)
-                const note = `${quantity} শেয়ার × ৳${price} = ৳${sellTotal.toLocaleString()}`
-                return <span style={{ color: 'var(--text2)' }}>💡 {note}</span>
-              })()}
+          {error && (
+            <div style={{ color: 'var(--red)', fontSize: 13, marginTop: 12, padding: '10px 14px', background: 'rgba(251,113,133,0.08)', borderRadius: 'var(--radius-xs)', border: '1px solid rgba(251,113,133,0.15)' }}>
+              ⚠️ {error}
             </div>
           )}
-
-          {error && <div style={{ color: 'var(--red)', fontSize: 13, marginTop: 10, padding: '8px 12px', background: 'rgba(239,68,68,0.08)', borderRadius: 6 }}>⚠️ {error}</div>}
         </div>
 
         <div className="modal-footer">

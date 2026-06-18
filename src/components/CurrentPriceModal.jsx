@@ -1,12 +1,30 @@
 import { useState } from 'react'
+import { supabase } from '../lib/supabase'
 import { X, TrendingUp, TrendingDown } from 'lucide-react'
 import { formatTaka } from '../lib/utils'
 
 export default function CurrentPriceModal({ holdings, prices, onSave, onClose }) {
   const [localPrices, setLocalPrices] = useState({ ...prices })
+  const [saving, setSaving] = useState(false)
 
-  function handleSave() {
+  async function handleSave() {
+    setSaving(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const rows = Object.entries(localPrices)
+        .filter(([, price]) => price && Number(price) > 0)
+        .map(([stock_name, price]) => ({
+          user_id: user.id,
+          stock_name,
+          price: Number(price),
+          updated_at: new Date().toISOString()
+        }))
+      if (rows.length > 0) {
+        await supabase.from('current_prices').upsert(rows, { onConflict: 'user_id,stock_name' })
+      }
+    }
     onSave(localPrices)
+    setSaving(false)
     onClose()
   }
 
@@ -16,7 +34,7 @@ export default function CurrentPriceModal({ holdings, prices, onSave, onClose })
         <div className="modal-header">
           <div>
             <h3 style={{ fontSize: 17, fontWeight: 800 }}>বর্তমান দাম আপডেট</h3>
-            <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>DSE থেকে দেখে দাম দিন → Unrealized P&L দেখাবে</p>
+            <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>সব ডিভাইসে সিঙ্ক হবে</p>
           </div>
           <button className="icon-btn" onClick={onClose}><X size={16} /></button>
         </div>
@@ -61,7 +79,9 @@ export default function CurrentPriceModal({ holdings, prices, onSave, onClose })
         </div>
         <div className="modal-footer">
           <button className="btn btn-ghost" onClick={onClose}>বাতিল</button>
-          <button className="btn btn-primary" onClick={handleSave}>✅ সংরক্ষণ করুন</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? '⏳ সংরক্ষণ হচ্ছে...' : '✅ সংরক্ষণ করুন'}
+          </button>
         </div>
       </div>
     </div>
