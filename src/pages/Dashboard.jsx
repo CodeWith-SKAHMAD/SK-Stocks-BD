@@ -58,19 +58,28 @@ export default function Dashboard({ onNavigate }) {
   const [showModal, setShowModal] = useState(false)
   const [showPriceModal, setShowPriceModal] = useState(false)
   const [period, setPeriod] = useState('weekly')
-  const [currentPrices, setCurrentPrices] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('bd_current_prices') || '{}') } catch { return {} }
-  })
+  const [currentPrices, setCurrentPrices] = useState({})
   const market = getMarketStatus()
 
   useEffect(() => {
     fetchTransactions()
+    fetchPrices()
     const channel = supabase
       .channel('dashboard-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => fetchTransactions())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'current_prices' }, () => fetchPrices())
       .subscribe()
     return () => supabase.removeChannel(channel)
   }, [])
+
+  async function fetchPrices() {
+    const { data } = await supabase.from('current_prices').select('stock_name, price')
+    if (data) {
+      const map = {}
+      data.forEach(p => { map[p.stock_name] = p.price })
+      setCurrentPrices(map)
+    }
+  }
 
   async function fetchTransactions() {
     const { data } = await supabase.from('transactions').select('*').order('date', { ascending: true })
@@ -80,7 +89,6 @@ export default function Dashboard({ onNavigate }) {
 
   function savePrices(prices) {
     setCurrentPrices(prices)
-    localStorage.setItem('bd_current_prices', JSON.stringify(prices))
   }
 
   const { totalRealizedPL, holdings } = calcPortfolio(transactions)
