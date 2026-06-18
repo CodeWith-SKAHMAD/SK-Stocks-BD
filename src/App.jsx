@@ -8,10 +8,11 @@ import Calculator from './pages/Calculator'
 import Signals from './pages/Signals'
 import ProfilePage from './pages/Profile'
 import Report from './pages/Report'
+import Notes from './pages/Notes'
 import AddTransactionModal from './components/AddTransactionModal'
 import {
   LayoutDashboard, BarChart2, TrendingUp, Calculator as CalcIcon,
-  Zap, FileText, Sun, Moon, Menu, X, Plus, LogOut
+  Zap, FileText, StickyNote, Sun, Moon, Menu, X, Plus, LogOut
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
 
@@ -22,6 +23,7 @@ const NAV = [
   { id: 'calculator', label: 'ক্যালকুলেটর', icon: CalcIcon },
   { id: 'signals', label: 'সিগন্যাল', icon: Zap },
   { id: 'report', label: 'রিপোর্ট', icon: FileText },
+  { id: 'notes', label: 'নোট', icon: StickyNote },
 ]
 
 function AppInner() {
@@ -67,6 +69,7 @@ function AppInner() {
     calculator: '🧮 ক্যালকুলেটর',
     signals: '⚡ সিগন্যাল',
     report: '📄 রিপোর্ট',
+    notes: '📝 নোট',
     profile: '👤 প্রোফাইল',
   }
 
@@ -78,6 +81,7 @@ function AppInner() {
       case 'calculator': return <Calculator />
       case 'signals': return <Signals />
       case 'report': return <Report />
+      case 'notes': return <Notes />
       case 'profile': return <ProfilePage />
       default: return <Dashboard onNavigate={setPage} />
     }
