@@ -8,7 +8,36 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, 
 import AddTransactionModal from '../components/AddTransactionModal'
 import CurrentPriceModal from '../components/CurrentPriceModal'
 
-const COLORS = ['#00e5b4', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#fb923c']
+const COLORS = ['#34d399', '#60a5fa', '#fbbf24', '#fb7185', '#a78bfa', '#fb923c']
+
+// বাংলাদেশ লাইভ ঘড়ি
+function BDClock() {
+  const [time, setTime] = useState('')
+  useEffect(() => {
+    function update() {
+      const now = new Date()
+      const bd = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Dhaka' }))
+      const h = bd.getHours().toString().padStart(2, '0')
+      const m = bd.getMinutes().toString().padStart(2, '0')
+      const s = bd.getSeconds().toString().padStart(2, '0')
+      setTime(`${h}:${m}:${s}`)
+    }
+    update()
+    const timer = setInterval(update, 1000)
+    return () => clearInterval(timer)
+  }, [])
+  return (
+    <span style={{
+      fontSize: 12, fontWeight: 700, color: 'var(--text2)',
+      background: 'var(--bg3)', border: '1px solid var(--border)',
+      padding: '4px 10px', borderRadius: 20,
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      fontFamily: 'var(--mono)'
+    }}>
+      🇧🇩 {time}
+    </span>
+  )
+}
 
 function FearGreedMeter({ value }) {
   const clamp = Math.min(100, Math.max(0, value))
@@ -162,6 +191,7 @@ export default function Dashboard({ onNavigate }) {
               <div className={`dot ${market.isOpen ? 'dot-green' : 'dot-red'}`} />
               DSE {market.isOpen ? 'বাজার খোলা' : 'বাজার বন্ধ'}
             </div>
+            <BDClock />
             {!market.isOpen && market.nextOpen && (
               <span style={{ fontSize: 12, color: 'var(--text3)', display: 'flex', alignItems: 'center', gap: 4 }}>
                 <Clock size={12} /> {market.nextOpen} খুলবে
