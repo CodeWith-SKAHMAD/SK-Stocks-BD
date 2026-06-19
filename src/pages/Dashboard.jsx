@@ -156,14 +156,6 @@ export default function Dashboard({ onNavigate }) {
     return Object.values(map).slice(-6)
   }
 
-  // Fear & Greed: realized + unrealized মিলিয়ে
-  function calcFearGreed() {
-    if (totalBought === 0) return 50
-    const totalPL = totalRealizedPL + totalUnrealized
-    const ratio = (totalPL / totalBought) * 100
-    return Math.min(100, Math.max(0, Math.round(50 + ratio * 3)))
-  }
-
   const periodPL = getPeriodPL()
   const chartData = getChartData()
   const firstName = profile?.full_name?.split(' ')[0] || 'বিনিয়োগকারী'
@@ -331,24 +323,90 @@ export default function Dashboard({ onNavigate }) {
 
         <div className="card">
           <div className="section-header">
-            <div><div className="section-title">পোর্টফোলিও মিটার</div><div className="section-sub">Fear & Greed Index</div></div>
+            <div>
+              <div className="section-title">📊 স্টক বরাদ্দ</div>
+              <div className="section-sub">কোন স্টকে কত টাকা</div>
+            </div>
+            {holdingList.length > 0 && (
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 11, color: 'var(--text3)' }}>{holdingList.length}টি স্টক</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>{formatTaka(holdingList.reduce((s,h)=>s+h.cost,0))}</div>
+              </div>
+            )}
           </div>
-          <FearGreedMeter value={calcFearGreed()} />
-          {holdingList.length > 0 && (
-            <div style={{ height: 140, marginTop: 6 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={holdingEntries.map(([name, h], i) => ({ name, value: h.cost, color: COLORS[i % COLORS.length] }))}
-                    cx="50%" cy="50%" innerRadius={32} outerRadius={60}
-                    dataKey="value" paddingAngle={3}
-                  >
-                    {holdingEntries.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip formatter={v => formatTaka(v)} />
-                  <Legend formatter={v => <span style={{ fontSize: 10 }}>{v}</span>} />
-                </PieChart>
-              </ResponsiveContainer>
+          {holdingEntries.length > 0 ? (
+            <>
+              <div style={{ height: 260 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <defs>
+                      {holdingEntries.map(([, ], i) => (
+                        <filter key={i} id={`shadow${i}`} x="-20%" y="-20%" width="140%" height="140%">
+                          <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor={COLORS[i % COLORS.length]} floodOpacity="0.4" />
+                        </filter>
+                      ))}
+                    </defs>
+                    <Pie
+                      data={holdingEntries.map(([name, h], i) => ({ name, value: h.cost, color: COLORS[i % COLORS.length] }))}
+                      cx="50%" cy="50%"
+                      innerRadius={65}
+                      outerRadius={110}
+                      dataKey="value"
+                      paddingAngle={4}
+                      stroke="none"
+                    >
+                      {holdingEntries.map(([, ], i) => (
+                        <Cell
+                          key={i}
+                          fill={COLORS[i % COLORS.length]}
+                          filter={`url(#shadow${i})`}
+                          style={{ cursor: 'pointer', outline: 'none' }}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(v, name) => [formatTaka(v), name]}
+                      contentStyle={{
+                        background: 'var(--bg2)',
+                        border: '1px solid var(--border2)',
+                        borderRadius: 10,
+                        fontSize: 13,
+                        fontWeight: 600,
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
+                      }}
+                    />
+                    <Legend
+                      iconType="circle"
+                      iconSize={8}
+                      formatter={(v, entry) => (
+                        <span style={{ fontSize: 12, color: 'var(--text2)', fontWeight: 600 }}>
+                          {v} <span style={{ color: entry.color, fontWeight: 700 }}>
+                            {holdingEntries.find(([n]) => n === v) ? `(${((holdingEntries.find(([n]) => n === v)[1].cost / holdingList.reduce((s,h)=>s+h.cost,0)) * 100).toFixed(1)}%)` : ''}
+                          </span>
+                        </span>
+                      )}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              {/* Center stats */}
+              <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                {holdingEntries.map(([name, h], i) => (
+                  <div key={name} style={{
+                    flex: 1, padding: '8px 10px', borderRadius: 8,
+                    background: `${COLORS[i % COLORS.length]}15`,
+                    border: `1px solid ${COLORS[i % COLORS.length]}30`,
+                    textAlign: 'center'
+                  }}>
+                    <div style={{ fontSize: 10, color: COLORS[i % COLORS.length], fontWeight: 700 }}>{name}</div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)', marginTop: 2 }}>{formatTaka(h.cost)}</div>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="empty" style={{ height: 200 }}>
+              <p>হোল্ডিং যোগ করলে চার্ট দেখাবে</p>
             </div>
           )}
         </div>
