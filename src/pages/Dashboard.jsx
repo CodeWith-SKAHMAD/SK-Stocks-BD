@@ -87,6 +87,7 @@ export default function Dashboard({ onNavigate }) {
   const [showModal, setShowModal] = useState(false)
   const [showPriceModal, setShowPriceModal] = useState(false)
   const [period, setPeriod] = useState('weekly')
+  const [chartPeriod, setChartPeriod] = useState('30d')
   const [currentPrices, setCurrentPrices] = useState({})
   const market = getMarketStatus()
 
@@ -145,15 +146,53 @@ export default function Dashboard({ onNavigate }) {
     return pl
   }
 
+  // Portfolio value-এর দৈনিক history (cumulative invested amount)
   function getChartData() {
-    const map = {}
-    transactions.forEach(t => {
-      const month = t.date.substring(0, 7)
-      if (!map[month]) map[month] = { month, buy: 0, sell: 0 }
-      if (t.type === 'BUY') map[month].buy += Number(t.total_cost)
-      else map[month].sell += Number(t.total_cost)
+    if (transactions.length === 0) return []
+
+    const days = chartPeriod === '7d' ? 7 : chartPeriod === '30d' ? 30 : chartPeriod === '90d' ? 90 : 9999
+    const sorted = [...transactions].sort((a, b) => new Date(a.date) - new Date(b.date))
+    const firstDate = new Date(sorted[0].date)
+    const today = new Date()
+    const startDate = days === 9999 ? firstDate : new Date(today.getTime() - days * 86400000)
+    const rangeStart = startDate > firstDate ? startDate : firstDate
+
+    // প্রতিদিনের cumulative net invested value হিসাব করি
+    const dayMap = {}
+    let cumulative = 0
+    sorted.forEach(t => {
+      const amt = t.type === 'BUY' ? Number(t.total_cost) : -Number(t.total_cost)
+      cumulative += amt
+      dayMap[t.date] = cumulative
     })
-    return Object.values(map).slice(-6)
+
+    // rangeStart থেকে আজ পর্যন্ত প্রতিদিনের পয়েন্ট তৈরি করি
+    const result = []
+    let runningValue = 0
+    const allDatesSorted = Object.keys(dayMap).sort()
+
+    const d = new Date(rangeStart)
+    while (d <= today) {
+      const dateStr = d.toISOString().split('T')[0]
+      // এই তারিখ পর্যন্ত সর্বশেষ cumulative value খুঁজি
+      for (const dt of allDatesSorted) {
+        if (dt <= dateStr) runningValue = dayMap[dt]
+        else break
+      }
+      result.push({
+        date: dateStr,
+        label: d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
+        value: runningValue
+      })
+      d.setDate(d.getDate() + 1)
+    }
+
+    // অনেক পয়েন্ট হলে sample করি (max ৩০ পয়েন্ট দেখাবো)
+    if (result.length > 30) {
+      const step = Math.ceil(result.length / 30)
+      return result.filter((_, i) => i % step === 0 || i === result.length - 1)
+    }
+    return result
   }
 
   const periodPL = getPeriodPL()
@@ -304,17 +343,39 @@ export default function Dashboard({ onNavigate }) {
       <div className="grid-2" style={{ marginBottom: 20 }}>
         <div className="card">
           <div className="section-header">
-            <div><div className="section-title">মাসিক পারফরম্যান্স</div><div className="section-sub">গত ৬ মাস</div></div>
+            <div><div className="section-title">পোর্টফোলিও ভ্যালু</div><div className="section-sub">সময়ের সাথে বিনিয়োগের পরিবর্তন</div></div>
+          </div>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+            {[
+              { id: '7d', label: '৭ দিন' },
+              { id: '30d', label: '৩০ দিন' },
+              { id: '90d', label: '৯০ দিন' },
+              { id: 'all', label: 'সব সময়' },
+            ].map(p => (
+              <button key={p.id} className={`period-tab ${chartPeriod === p.id ? 'active' : ''}`}
+                onClick={() => setChartPeriod(p.id)}>
+                {p.label}
+              </button>
+            ))}
           </div>
           {chartData.length > 0 ? (
             <div className="chart-container">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData}>
-                  <XAxis dataKey="month" tick={{ fill: 'var(--text3)', fontSize: 11 }} />
+                  <defs>
+                    <linearGradient id="valueGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.25}/>
+                      <stop offset="95%" stopColor="var(--accent)" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="label" tick={{ fill: 'var(--text3)', fontSize: 10.5 }} interval={Math.max(0, Math.floor(chartData.length / 6) - 1)} />
                   <YAxis tick={{ fill: 'var(--text3)', fontSize: 11 }} tickFormatter={v => '৳' + (v/1000).toFixed(0) + 'k'} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Line type="monotone" dataKey="buy" stroke="var(--accent2)" strokeWidth={2} dot={false} name="কেনা" />
-                  <Line type="monotone" dataKey="sell" stroke="var(--green)" strokeWidth={2} dot={false} name="বেচা" />
+                  <Tooltip
+                    formatter={(v) => [formatTaka(v), 'পোর্টফোলিও মূল্য']}
+                    labelFormatter={(l) => l}
+                    contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 10, fontSize: 12 }}
+                  />
+                  <Line type="monotone" dataKey="value" stroke="var(--accent)" strokeWidth={2.5} dot={false} fill="url(#valueGradient)" name="পোর্টফোলিও মূল্য" />
                 </LineChart>
               </ResponsiveContainer>
             </div>
