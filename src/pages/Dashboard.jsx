@@ -3,16 +3,16 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { getMarketStatus, formatTaka } from '../lib/utils'
 import { calcPortfolio } from '../lib/portfolio'
-import { TrendingUp, TrendingDown, DollarSign, BarChart2, Clock, Plus, RefreshCw } from 'lucide-react'
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
+import { TrendingUp, TrendingDown, DollarSign, BarChart2, Clock, Plus, RefreshCw, Wallet, Layers } from 'lucide-react'
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import AddTransactionModal from '../components/AddTransactionModal'
 import CurrentPriceModal from '../components/CurrentPriceModal'
 
-const COLORS = ['#34d399', '#60a5fa', '#fbbf24', '#fb7185', '#a78bfa', '#fb923c']
+const COLORS = ['#ff7a45', '#6366f1', '#22c55e', '#f5a524', '#ec4899', '#06b6d4']
 
-// বাংলাদেশ লাইভ ঘড়ি
 function BDClock() {
   const [time, setTime] = useState('')
+  const [dateStr, setDateStr] = useState('')
   useEffect(() => {
     function update() {
       const now = new Date()
@@ -21,61 +21,24 @@ function BDClock() {
       const m = bd.getMinutes().toString().padStart(2, '0')
       const s = bd.getSeconds().toString().padStart(2, '0')
       setTime(`${h}:${m}:${s}`)
+      setDateStr(bd.toLocaleDateString('bn-BD', { weekday: 'short', day: 'numeric', month: 'short' }))
     }
     update()
     const timer = setInterval(update, 1000)
     return () => clearInterval(timer)
   }, [])
   return (
-    <span style={{
-      fontSize: 12, fontWeight: 700, color: 'var(--text2)',
-      background: 'var(--bg3)', border: '1px solid var(--border)',
-      padding: '4px 10px', borderRadius: 20,
-      display: 'inline-flex', alignItems: 'center', gap: 5,
-      fontFamily: 'var(--mono)'
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10,
+      background: 'var(--glass)', border: '1px solid var(--border)',
+      padding: '8px 16px', borderRadius: 16,
+      backdropFilter: 'blur(10px)'
     }}>
-      🇧🇩 {time}
-    </span>
-  )
-}
-
-function FearGreedMeter({ value }) {
-  const clamp = Math.min(100, Math.max(0, value))
-  const angle = -90 + (clamp / 100) * 180
-  let label, color
-  if (clamp <= 20)      { label = 'Extreme Fear'; color = '#ef4444' }
-  else if (clamp <= 40) { label = 'Fear';          color = '#fb923c' }
-  else if (clamp <= 60) { label = 'Neutral';       color = '#f59e0b' }
-  else if (clamp <= 80) { label = 'Greed';         color = '#00e5b4' }
-  else                  { label = 'Extreme Greed'; color = '#10b981' }
-
-  const toRad = d => (d * Math.PI) / 180
-  const r = 76, cx = 100, cy = 100
-  const segs = [
-    { s: -90, e: -54, c: '#ef4444' },
-    { s: -54, e: -18, c: '#fb923c' },
-    { s: -18, e:  18, c: '#f59e0b' },
-    { s:  18, e:  54, c: '#00e5b4' },
-    { s:  54, e:  90, c: '#10b981' },
-  ]
-
-  return (
-    <div style={{ textAlign: 'center' }}>
-      <svg viewBox="0 0 200 112" style={{ width: '100%', maxWidth: 200, display: 'block', margin: '0 auto' }}>
-        {segs.map((seg, i) => {
-          const x1 = cx + r * Math.cos(toRad(seg.s)), y1 = cy + r * Math.sin(toRad(seg.s))
-          const x2 = cx + r * Math.cos(toRad(seg.e)), y2 = cy + r * Math.sin(toRad(seg.e))
-          return <path key={i} d={`M${cx} ${cy} L${x1} ${y1} A${r} ${r} 0 0 1 ${x2} ${y2}Z`} fill={seg.c} opacity="0.9" />
-        })}
-        <circle cx={cx} cy={cy} r="50" fill="var(--card)" />
-        <line x1={cx} y1={cy}
-          x2={cx + 60 * Math.cos(toRad(angle))} y2={cy + 60 * Math.sin(toRad(angle))}
-          stroke="var(--text)" strokeWidth="2.5" strokeLinecap="round" />
-        <circle cx={cx} cy={cy} r="5" fill="var(--text)" />
-        <text x={cx} y={cy - 6} textAnchor="middle" fontSize="18" fontWeight="800" fill={color}>{clamp}</text>
-        <text x={cx} y={cy + 8} textAnchor="middle" fontSize="8" fill="var(--text2)">{label}</text>
-      </svg>
-      <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>Portfolio Sentiment</div>
+      <span style={{ fontSize: 18 }}>🇧🇩</span>
+      <div>
+        <div style={{ fontSize: 17, fontWeight: 800, fontFamily: 'var(--mono)', letterSpacing: '0.5px', lineHeight: 1, color: 'var(--text)' }}>{time}</div>
+        <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>{dateStr}</div>
+      </div>
     </div>
   )
 }
@@ -102,6 +65,12 @@ export default function Dashboard({ onNavigate }) {
     return () => supabase.removeChannel(channel)
   }, [])
 
+  async function fetchTransactions() {
+    const { data } = await supabase.from('transactions').select('*').order('date', { ascending: true })
+    setTransactions(data || [])
+    setLoading(false)
+  }
+
   async function fetchPrices() {
     const { data } = await supabase.from('current_prices').select('stock_name, price')
     if (data) {
@@ -109,12 +78,6 @@ export default function Dashboard({ onNavigate }) {
       data.forEach(p => { map[p.stock_name] = p.price })
       setCurrentPrices(map)
     }
-  }
-
-  async function fetchTransactions() {
-    const { data } = await supabase.from('transactions').select('*').order('date', { ascending: true })
-    setTransactions(data || [])
-    setLoading(false)
   }
 
   function savePrices(prices) {
@@ -127,7 +90,6 @@ export default function Dashboard({ onNavigate }) {
   const totalInvested = holdingList.reduce((s, h) => s + h.cost, 0)
   const totalBought = transactions.filter(t => t.type === 'BUY').reduce((s, t) => s + Number(t.total_cost), 0)
 
-  // Unrealized P&L হিসাব
   const unrealizedData = holdingEntries.map(([name, h]) => {
     const curPrice = Number(currentPrices[name] || 0)
     const curValue = curPrice > 0 ? curPrice * h.qty : 0
@@ -146,10 +108,8 @@ export default function Dashboard({ onNavigate }) {
     return pl
   }
 
-  // Portfolio value-এর দৈনিক history (cumulative invested amount)
   function getChartData() {
     if (transactions.length === 0) return []
-
     const days = chartPeriod === '7d' ? 7 : chartPeriod === '30d' ? 30 : chartPeriod === '90d' ? 90 : 9999
     const sorted = [...transactions].sort((a, b) => new Date(a.date) - new Date(b.date))
     const firstDate = new Date(sorted[0].date)
@@ -157,7 +117,6 @@ export default function Dashboard({ onNavigate }) {
     const startDate = days === 9999 ? firstDate : new Date(today.getTime() - days * 86400000)
     const rangeStart = startDate > firstDate ? startDate : firstDate
 
-    // প্রতিদিনের cumulative net invested value হিসাব করি
     const dayMap = {}
     let cumulative = 0
     sorted.forEach(t => {
@@ -166,28 +125,19 @@ export default function Dashboard({ onNavigate }) {
       dayMap[t.date] = cumulative
     })
 
-    // rangeStart থেকে আজ পর্যন্ত প্রতিদিনের পয়েন্ট তৈরি করি
     const result = []
     let runningValue = 0
     const allDatesSorted = Object.keys(dayMap).sort()
-
     const d = new Date(rangeStart)
     while (d <= today) {
       const dateStr = d.toISOString().split('T')[0]
-      // এই তারিখ পর্যন্ত সর্বশেষ cumulative value খুঁজি
       for (const dt of allDatesSorted) {
         if (dt <= dateStr) runningValue = dayMap[dt]
         else break
       }
-      result.push({
-        date: dateStr,
-        label: d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
-        value: runningValue
-      })
+      result.push({ date: dateStr, label: d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }), value: runningValue })
       d.setDate(d.getDate() + 1)
     }
-
-    // অনেক পয়েন্ট হলে sample করি (max ৩০ পয়েন্ট দেখাবো)
     if (result.length > 30) {
       const step = Math.ceil(result.length / 30)
       return result.filter((_, i) => i % step === 0 || i === result.length - 1)
@@ -199,38 +149,27 @@ export default function Dashboard({ onNavigate }) {
   const chartData = getChartData()
   const firstName = profile?.full_name?.split(' ')[0] || 'বিনিয়োগকারী'
 
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload?.length) return (
-      <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', fontSize: 13 }}>
-        <p style={{ color: 'var(--text2)', marginBottom: 4 }}>{label}</p>
-        {payload.map((p, i) => <p key={i} style={{ color: p.color, fontWeight: 600 }}>{p.name}: {formatTaka(p.value)}</p>)}
-      </div>
-    )
-    return null
-  }
-
   if (loading) return <div className="loading"><div className="spinner" /><span>লোড হচ্ছে...</span></div>
 
   return (
     <div className="fade-up">
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 14 }}>
         <div>
-          <h2 style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.5px' }}>{firstName}'s Portfolio</h2>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 5, flexWrap: 'wrap' }}>
+          <h2 style={{ fontSize: 23, fontWeight: 800, letterSpacing: '-0.5px' }}>{firstName}'s Portfolio</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
             <div className={`market-badge ${market.isOpen ? 'market-open' : 'market-closed'}`}>
               <div className={`dot ${market.isOpen ? 'dot-green' : 'dot-red'}`} />
               DSE {market.isOpen ? 'বাজার খোলা' : 'বাজার বন্ধ'}
             </div>
-            <BDClock />
             {!market.isOpen && market.nextOpen && (
-              <span style={{ fontSize: 12, color: 'var(--text3)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                <Clock size={12} /> {market.nextOpen} খুলবে
+              <span style={{ fontSize: 11.5, color: 'var(--text3)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Clock size={11} /> {market.nextOpen} খুলবে
               </span>
             )}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <BDClock />
           {holdingList.length > 0 && (
             <button className="btn btn-ghost btn-sm" onClick={() => setShowPriceModal(true)}>
               <RefreshCw size={13} /> দাম আপডেট
@@ -242,27 +181,25 @@ export default function Dashboard({ onNavigate }) {
         </div>
       </div>
 
-      {/* Stat Cards */}
       <div className="stat-grid">
         <div className="stat-card blue">
-          <div className="stat-label">মোট বিনিয়োগ</div>
+          <div className="stat-label"><Wallet size={11} style={{display:'inline', marginRight: 4}} />মোট বিনিয়োগ</div>
           <div className="stat-value">{formatTaka(totalBought)}</div>
           <div className="stat-sub"><BarChart2 size={12} /> {transactions.filter(t => t.type === 'BUY').length}টি কেনা</div>
         </div>
         <div className="stat-card yellow">
-          <div className="stat-label">সক্রিয় হোল্ডিং</div>
+          <div className="stat-label"><Layers size={11} style={{display:'inline', marginRight: 4}} />সক্রিয় হোল্ডিং</div>
           <div className="stat-value">{formatTaka(totalInvested)}</div>
           <div className="stat-sub">{holdingList.length}টি স্টক হাতে</div>
         </div>
-        <div className={`stat-card ${periodPL >= 0 ? 'green' : 'red'}`}>
-          <div className="stat-label">
-            <div style={{ display: 'flex', gap: 5, marginBottom: 4 }}>
-              <button className={`period-tab ${period === 'weekly' ? 'active' : ''}`} onClick={() => setPeriod('weekly')} style={{ padding: '2px 8px', fontSize: 10 }}>সাপ্তাহিক</button>
-              <button className={`period-tab ${period === 'monthly' ? 'active' : ''}`} onClick={() => setPeriod('monthly')} style={{ padding: '2px 8px', fontSize: 10 }}>মাসিক</button>
-            </div>
+        <div className={`stat-card ${totalUnrealized >= 0 ? 'green' : 'red'}`}>
+          <div className="stat-label">📊 Unrealized P&L</div>
+          <div className={`stat-value ${totalUnrealized >= 0 ? 'profit' : 'loss'}`}>
+            {hasPrices ? `${totalUnrealized >= 0 ? '+' : ''}${formatTaka(totalUnrealized)}` : '—'}
           </div>
-          <div className={`stat-value ${periodPL >= 0 ? 'profit' : 'loss'}`}>{formatTaka(Math.abs(periodPL))}</div>
-          <div className="stat-sub">{periodPL >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}{periodPL >= 0 ? '✅ লাভ' : '❌ ক্ষতি'}</div>
+          <div className="stat-sub" onClick={() => onNavigate && onNavigate('unrealized-report')} style={{ cursor: 'pointer', textDecoration: 'underline' }}>
+            {hasPrices ? 'রিপোর্ট দেখুন →' : 'দাম আপডেট করুন'}
+          </div>
         </div>
         <div className={`stat-card ${totalRealizedPL >= 0 ? 'green' : 'red'}`}>
           <div className="stat-label">Realized P&L</div>
@@ -273,220 +210,150 @@ export default function Dashboard({ onNavigate }) {
         </div>
       </div>
 
-      {/* Unrealized P&L Section */}
-      {holdingList.length > 0 && (
-        <div className="card" style={{ marginBottom: 20 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-            <div>
-              <div className="section-title">📊 Unrealized P&L</div>
-              <div className="section-sub">বর্তমান বাজার দাম অনুযায়ী লাভ/ক্ষতি</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 16, marginBottom: 20 }} className="dashboard-main-grid">
+        <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 16 }} className="dashboard-charts-grid">
+          <div className="card">
+            <div className="section-header">
+              <div><div className="section-title">পোর্টফোলিও ভ্যালু</div><div className="section-sub">সময়ের সাথে পরিবর্তন</div></div>
             </div>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-              {hasPrices && (
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 11, color: 'var(--text2)' }}>মোট Unrealized</div>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: totalUnrealized >= 0 ? 'var(--green)' : 'var(--red)' }}>
-                    {totalUnrealized >= 0 ? '+' : ''}{formatTaka(totalUnrealized)}
-                  </div>
-                </div>
-              )}
-              <button className="btn btn-ghost btn-sm" onClick={() => setShowPriceModal(true)}>
-                <RefreshCw size={12} /> দাম দিন
-              </button>
+            <div style={{ display: 'flex', gap: 5, marginBottom: 12, flexWrap: 'wrap' }}>
+              {[{ id: '7d', label: '৭দিন' }, { id: '30d', label: '৩০দিন' }, { id: '90d', label: '৯০দিন' }, { id: 'all', label: 'সব' }].map(p => (
+                <button key={p.id} className={`period-tab ${chartPeriod === p.id ? 'active' : ''}`} onClick={() => setChartPeriod(p.id)} style={{ padding: '4px 10px', fontSize: 10.5 }}>
+                  {p.label}
+                </button>
+              ))}
             </div>
-          </div>
-
-          {!hasPrices ? (
-            <div style={{ textAlign: 'center', padding: '16px', color: 'var(--text3)', fontSize: 13 }}>
-              💡 "দাম দিন" বাটন চাপুন → DSE থেকে বর্তমান দাম দিন → Unrealized P&L দেখাবে
-            </div>
-          ) : (
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>স্টক</th>
-                    <th>শেয়ার</th>
-                    <th>গড় কেনা</th>
-                    <th>বর্তমান দাম</th>
-                    <th>বর্তমান মূল্য</th>
-                    <th>লাভ/ক্ষতি</th>
-                    <th>%</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {unrealizedData.map(h => (
-                    <tr key={h.name}>
-                      <td style={{ fontWeight: 700 }}>{h.name}</td>
-                      <td style={{ color: 'var(--accent)', fontWeight: 600 }}>{h.qty}</td>
-                      <td>{formatTaka(h.avgPrice)}</td>
-                      <td style={{ fontWeight: 600 }}>
-                        {h.curPrice > 0 ? formatTaka(h.curPrice) : <span style={{ color: 'var(--text3)', fontSize: 12 }}>দাম দিন</span>}
-                      </td>
-                      <td>{h.curValue > 0 ? formatTaka(h.curValue) : '—'}</td>
-                      <td style={{ fontWeight: 700, color: h.unrealized !== null ? (h.unrealized >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--text3)' }}>
-                        {h.unrealized !== null ? `${h.unrealized >= 0 ? '+' : ''}${formatTaka(h.unrealized)}` : '—'}
-                      </td>
-                      <td style={{ fontWeight: 600, color: h.pct !== null ? (Number(h.pct) >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--text3)' }}>
-                        {h.pct !== null ? `${Number(h.pct) >= 0 ? '+' : ''}${h.pct}%` : '—'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Charts */}
-      <div className="grid-2" style={{ marginBottom: 20 }}>
-        <div className="card">
-          <div className="section-header">
-            <div><div className="section-title">পোর্টফোলিও ভ্যালু</div><div className="section-sub">সময়ের সাথে বিনিয়োগের পরিবর্তন</div></div>
-          </div>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
-            {[
-              { id: '7d', label: '৭ দিন' },
-              { id: '30d', label: '৩০ দিন' },
-              { id: '90d', label: '৯০ দিন' },
-              { id: 'all', label: 'সব সময়' },
-            ].map(p => (
-              <button key={p.id} className={`period-tab ${chartPeriod === p.id ? 'active' : ''}`}
-                onClick={() => setChartPeriod(p.id)}>
-                {p.label}
-              </button>
-            ))}
-          </div>
-          {chartData.length > 0 ? (
-            <div className="chart-container">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData}>
-                  <defs>
-                    <linearGradient id="valueGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.25}/>
-                      <stop offset="95%" stopColor="var(--accent)" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="label" tick={{ fill: 'var(--text3)', fontSize: 10.5 }} interval={Math.max(0, Math.floor(chartData.length / 6) - 1)} />
-                  <YAxis tick={{ fill: 'var(--text3)', fontSize: 11 }} tickFormatter={v => '৳' + (v/1000).toFixed(0) + 'k'} />
-                  <Tooltip
-                    formatter={(v) => [formatTaka(v), 'পোর্টফোলিও মূল্য']}
-                    labelFormatter={(l) => l}
-                    contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 10, fontSize: 12 }}
-                  />
-                  <Line type="monotone" dataKey="value" stroke="var(--accent)" strokeWidth={2.5} dot={false} fill="url(#valueGradient)" name="পোর্টফোলিও মূল্য" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          ) : <div className="empty" style={{ height: 200 }}><p>ট্রানজেকশন যোগ করুন</p></div>}
-        </div>
-
-        <div className="card">
-          <div className="section-header">
-            <div>
-              <div className="section-title">📊 স্টক বরাদ্দ</div>
-              <div className="section-sub">কোন স্টকে কত টাকা</div>
-            </div>
-            {holdingList.length > 0 && (
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 11, color: 'var(--text3)' }}>{holdingList.length}টি স্টক</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>{formatTaka(holdingList.reduce((s,h)=>s+h.cost,0))}</div>
+            {chartData.length > 0 ? (
+              <div style={{ height: 230 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartData}>
+                    <defs>
+                      <linearGradient id="valueGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="var(--accent)" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="label" tick={{ fill: 'var(--text3)', fontSize: 10 }} interval={Math.max(0, Math.floor(chartData.length / 5) - 1)} />
+                    <YAxis tick={{ fill: 'var(--text3)', fontSize: 10 }} tickFormatter={v => '৳' + (v/1000).toFixed(0) + 'k'} width={40} />
+                    <Tooltip formatter={(v) => [formatTaka(v), 'মূল্য']} contentStyle={{ background: 'var(--glass2)', border: '1px solid var(--border2)', borderRadius: 10, fontSize: 12, backdropFilter: 'blur(10px)' }} />
+                    <Line type="monotone" dataKey="value" stroke="var(--accent)" strokeWidth={2.5} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
               </div>
-            )}
+            ) : <div className="empty" style={{ height: 180 }}><p style={{fontSize:12}}>ট্রানজেকশন যোগ করুন</p></div>}
           </div>
-          {holdingEntries.length > 0 ? (
-            <>
-              <div style={{ height: 260 }}>
+
+          <div className="card">
+            <div className="section-header">
+              <div><div className="section-title">স্টক বরাদ্দ</div><div className="section-sub">মোট বিনিয়োগ অনুপাত</div></div>
+            </div>
+            {holdingEntries.length > 0 ? (
+              <div style={{ position: 'relative', height: 230 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <defs>
-                      {holdingEntries.map(([, ], i) => (
-                        <filter key={i} id={`shadow${i}`} x="-20%" y="-20%" width="140%" height="140%">
-                          <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor={COLORS[i % COLORS.length]} floodOpacity="0.4" />
-                        </filter>
-                      ))}
-                    </defs>
                     <Pie
                       data={holdingEntries.map(([name, h], i) => ({ name, value: h.cost, color: COLORS[i % COLORS.length] }))}
                       cx="50%" cy="50%"
-                      innerRadius={65}
-                      outerRadius={110}
+                      innerRadius={62}
+                      outerRadius={92}
                       dataKey="value"
-                      paddingAngle={4}
+                      paddingAngle={3}
                       stroke="none"
                     >
-                      {holdingEntries.map(([, ], i) => (
-                        <Cell
-                          key={i}
-                          fill={COLORS[i % COLORS.length]}
-                          filter={`url(#shadow${i})`}
-                          style={{ cursor: 'pointer', outline: 'none' }}
-                        />
-                      ))}
+                      {holdingEntries.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                     </Pie>
-                    <Tooltip
-                      formatter={(v, name) => [formatTaka(v), name]}
-                      contentStyle={{
-                        background: 'var(--bg2)',
-                        border: '1px solid var(--border2)',
-                        borderRadius: 10,
-                        fontSize: 13,
-                        fontWeight: 600,
-                        boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
-                      }}
-                    />
-                    <Legend
-                      iconType="circle"
-                      iconSize={8}
-                      formatter={(v, entry) => (
-                        <span style={{ fontSize: 12, color: 'var(--text2)', fontWeight: 600 }}>
-                          {v} <span style={{ color: entry.color, fontWeight: 700 }}>
-                            {holdingEntries.find(([n]) => n === v) ? `(${((holdingEntries.find(([n]) => n === v)[1].cost / holdingList.reduce((s,h)=>s+h.cost,0)) * 100).toFixed(1)}%)` : ''}
-                          </span>
-                        </span>
-                      )}
-                    />
+                    <Tooltip formatter={(v, name) => [formatTaka(v), name]} contentStyle={{ background: 'var(--glass2)', border: '1px solid var(--border2)', borderRadius: 10, fontSize: 12, backdropFilter: 'blur(10px)' }} />
                   </PieChart>
                 </ResponsiveContainer>
+                <div style={{
+                  position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+                  textAlign: 'center', pointerEvents: 'none'
+                }}>
+                  <div style={{ fontSize: 10, color: 'var(--text3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>মোট</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.5px' }}>
+                    {formatTaka(totalInvested)}
+                  </div>
+                </div>
               </div>
-              {/* Center stats */}
-              <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                {holdingEntries.map(([name, h], i) => (
-                  <div key={name} style={{
-                    flex: 1, padding: '8px 10px', borderRadius: 8,
-                    background: `${COLORS[i % COLORS.length]}15`,
-                    border: `1px solid ${COLORS[i % COLORS.length]}30`,
-                    textAlign: 'center'
-                  }}>
-                    <div style={{ fontSize: 10, color: COLORS[i % COLORS.length], fontWeight: 700 }}>{name}</div>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)', marginTop: 2 }}>{formatTaka(h.cost)}</div>
+            ) : <div className="empty" style={{ height: 180 }}><p style={{fontSize:12}}>হোল্ডিং নেই</p></div>}
+            {holdingEntries.length > 0 && (
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8, justifyContent: 'center' }}>
+                {holdingEntries.map(([name], i) => (
+                  <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10.5, color: 'var(--text2)' }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: COLORS[i % COLORS.length] }} />
+                    {name}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
+          <div className="section-header">
+            <div>
+              <div className="section-title" style={{ fontSize: 13 }}>📊 Unrealized</div>
+              <div className="section-sub" style={{ fontSize: 10.5 }}>বর্তমান বাজার অনুযায়ী</div>
+            </div>
+          </div>
+          {hasPrices ? (
+            <>
+              <div style={{ textAlign: 'center', padding: '12px 0', marginBottom: 10, background: 'var(--glass)', borderRadius: 14 }}>
+                <div style={{ fontSize: 10, color: 'var(--text3)' }}>মোট Unrealized</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: totalUnrealized >= 0 ? 'var(--green)' : 'var(--red)', marginTop: 4 }}>
+                  {totalUnrealized >= 0 ? '+' : ''}{formatTaka(totalUnrealized)}
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, overflowY: 'auto' }}>
+                {unrealizedData.map(h => (
+                  <div key={h.name} style={{ padding: '8px 10px', background: 'var(--glass)', borderRadius: 10, fontSize: 11.5 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                      <span style={{ fontWeight: 700 }}>{h.name}</span>
+                      <span style={{ fontWeight: 700, color: h.unrealized >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                        {h.unrealized !== null ? `${h.unrealized >= 0 ? '+' : ''}${h.pct}%` : '—'}
+                      </span>
+                    </div>
+                    <div style={{ color: 'var(--text3)', fontSize: 10.5 }}>
+                      {h.curPrice > 0 ? `${formatTaka(h.curPrice)} বর্তমান` : 'দাম নেই'}
+                    </div>
                   </div>
                 ))}
               </div>
             </>
           ) : (
-            <div className="empty" style={{ height: 200 }}>
-              <p>হোল্ডিং যোগ করলে চার্ট দেখাবে</p>
+            <div className="empty" style={{ padding: 20, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <p style={{ fontSize: 12 }}>"দাম আপডেট" চাপুন</p>
             </div>
           )}
+          <button className="btn btn-ghost btn-sm btn-full" style={{ marginTop: 10 }} onClick={() => setShowPriceModal(true)}>
+            <RefreshCw size={11} /> দাম আপডেট করুন
+          </button>
         </div>
       </div>
 
-      {/* Holdings Table */}
       {holdingList.length > 0 && (
-        <div className="card" style={{ marginBottom: 20 }}>
-          <div className="section-title" style={{ marginBottom: 14 }}>📦 বর্তমান হোল্ডিং</div>
+        <div className="card" style={{ marginBottom: 20, padding: 24 }}>
+          <div className="section-header">
+            <div>
+              <div className="section-title" style={{ fontSize: 17 }}>📦 বর্তমান হোল্ডিং</div>
+              <div className="section-sub">আপনার সক্রিয় বিনিয়োগ</div>
+            </div>
+            <button className="btn btn-ghost btn-sm" onClick={() => onNavigate && onNavigate('portfolio')}>সব দেখুন →</button>
+          </div>
           <div className="table-wrap">
             <table>
-              <thead><tr><th>স্টক</th><th>শেয়ার</th><th>গড় ক্রয়মূল্য</th><th>মোট বিনিয়োগ</th></tr></thead>
+              <thead><tr><th>স্টক</th><th>শেয়ার</th><th>গড় ক্রয়মূল্য</th><th>মোট বিনিয়োগ</th><th>বর্তমান মূল্য</th><th>লাভ/ক্ষতি</th></tr></thead>
               <tbody>
-                {holdingEntries.map(([name, h]) => (
-                  <tr key={name}>
-                    <td style={{ fontWeight: 700 }}>{name}</td>
-                    <td style={{ color: 'var(--accent)', fontWeight: 600 }}>{h.qty}</td>
+                {unrealizedData.map(h => (
+                  <tr key={h.name}>
+                    <td style={{ fontWeight: 700, fontSize: 14 }}>{h.name}</td>
+                    <td style={{ color: 'var(--accent)', fontWeight: 700 }}>{h.qty}</td>
                     <td>{formatTaka(h.avgPrice)}</td>
                     <td style={{ fontWeight: 600 }}>{formatTaka(h.cost)}</td>
+                    <td>{h.curValue > 0 ? formatTaka(h.curValue) : <span style={{color:'var(--text3)', fontSize:11}}>দাম দিন</span>}</td>
+                    <td style={{ fontWeight: 700, color: h.unrealized !== null ? (h.unrealized >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--text3)' }}>
+                      {h.unrealized !== null ? `${h.unrealized >= 0 ? '+' : ''}${formatTaka(h.unrealized)}` : '—'}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -495,33 +362,38 @@ export default function Dashboard({ onNavigate }) {
         </div>
       )}
 
-      {/* Recent Transactions */}
-      <div className="card">
-        <div className="section-header">
-          <div className="section-title">সাম্প্রতিক ট্রানজেকশন</div>
-          <button className="btn btn-ghost btn-sm" onClick={() => onNavigate('portfolio')}>সব দেখুন →</button>
-        </div>
-        {transactions.length === 0 ? (
-          <div className="empty"><DollarSign size={36} /><h3>কোনো ট্রানজেকশন নেই</h3><p>"ট্রানজেকশন যোগ করুন" চাপুন</p></div>
-        ) : (
-          <div className="table-wrap">
-            <table>
-              <thead><tr><th>তারিখ</th><th>স্টক</th><th>ধরন</th><th>শেয়ার</th><th>দাম</th><th>মোট</th></tr></thead>
-              <tbody>
-                {transactions.slice(-8).reverse().map(t => (
-                  <tr key={t.id}>
-                    <td style={{ color: 'var(--text2)', fontSize: 13 }}>{t.date}</td>
-                    <td><div style={{ fontWeight: 600 }}>{t.stock_name}</div><span className={`badge badge-${t.exchange?.toLowerCase()}`}>{t.exchange}</span></td>
-                    <td><span className={`badge badge-${t.type?.toLowerCase()}`}>{t.type === 'BUY' ? '📈 কেনা' : '📉 বেচা'}</span></td>
-                    <td>{t.quantity}</td>
-                    <td>{formatTaka(t.price)}</td>
-                    <td style={{ fontWeight: 600 }}>{formatTaka(t.total_cost)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      <div className="grid-2" style={{ marginBottom: 20 }}>
+        <div className="card">
+          <div className="period-tabs" style={{ marginBottom: 10 }}>
+            <button className={`period-tab ${period === 'weekly' ? 'active' : ''}`} onClick={() => setPeriod('weekly')}>সাপ্তাহিক</button>
+            <button className={`period-tab ${period === 'monthly' ? 'active' : ''}`} onClick={() => setPeriod('monthly')}>মাসিক</button>
           </div>
-        )}
+          <div className="stat-label">{period === 'weekly' ? 'সাপ্তাহিক' : 'মাসিক'} লাভ/ক্ষতি</div>
+          <div className={`stat-value ${periodPL >= 0 ? 'profit' : 'loss'}`} style={{ fontSize: 28 }}>{formatTaka(Math.abs(periodPL))}</div>
+          <div className="stat-sub">{periodPL >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}{periodPL >= 0 ? '✅ লাভ' : '❌ ক্ষতি'}</div>
+        </div>
+
+        <div className="card">
+          <div className="section-header">
+            <div className="section-title">সাম্প্রতিক ট্রানজেকশন</div>
+            <button className="btn btn-ghost btn-sm" onClick={() => onNavigate && onNavigate('portfolio')}>সব →</button>
+          </div>
+          {transactions.length === 0 ? (
+            <div className="empty" style={{ padding: 20 }}><DollarSign size={28} /><p style={{fontSize:12}}>কোনো ট্রানজেকশন নেই</p></div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {transactions.slice(-4).reverse().map(t => (
+                <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: 'var(--glass)', borderRadius: 10 }}>
+                  <div>
+                    <span style={{ fontWeight: 700, fontSize: 12.5 }}>{t.stock_name}</span>
+                    <span className={`badge badge-${t.type?.toLowerCase()}`} style={{ marginLeft: 6 }}>{t.type === 'BUY' ? 'কেনা' : 'বেচা'}</span>
+                  </div>
+                  <span style={{ fontWeight: 700, fontSize: 12.5 }}>{formatTaka(t.total_cost)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {showModal && <AddTransactionModal onClose={() => { setShowModal(false); fetchTransactions() }} />}
