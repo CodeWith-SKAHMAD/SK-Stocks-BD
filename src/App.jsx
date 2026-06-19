@@ -9,6 +9,7 @@ import Signals from './pages/Signals'
 import ProfilePage from './pages/Profile'
 import Report from './pages/Report'
 import Notes from './pages/Notes'
+import UnrealizedReport from './pages/UnrealizedReport'
 import AddTransactionModal from './components/AddTransactionModal'
 import {
   LayoutDashboard, BarChart2, TrendingUp, Calculator as CalcIcon,
@@ -24,6 +25,7 @@ const NAV = [
   { id: 'signals', label: 'সিগন্যাল', icon: Zap },
   { id: 'report', label: 'রিপোর্ট', icon: FileText },
   { id: 'notes', label: 'নোট', icon: StickyNote },
+  { id: 'unrealized-report', label: 'Unrealized P&L', icon: TrendingUp },
 ]
 
 function AppInner() {
@@ -70,6 +72,7 @@ function AppInner() {
     signals: '⚡ সিগন্যাল',
     report: '📄 রিপোর্ট',
     notes: '📝 নোট',
+    'unrealized-report': '📊 Unrealized P&L',
     profile: '👤 প্রোফাইল',
   }
 
@@ -82,6 +85,7 @@ function AppInner() {
       case 'signals': return <Signals />
       case 'report': return <Report />
       case 'notes': return <Notes />
+      case 'unrealized-report': return <UnrealizedReport />
       case 'profile': return <ProfilePage />
       default: return <Dashboard onNavigate={setPage} />
     }
