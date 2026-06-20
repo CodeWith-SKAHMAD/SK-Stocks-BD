@@ -31,8 +31,18 @@ export default function Portfolio() {
   }
 
   async function deleteTransaction(id) {
-    if (!confirm('এই ট্রানজেকশন মুছে ফেলবেন?')) return
+    if (!confirm('এই ট্রানজেকশন মুছে ফেলবেন? (সংযুক্ত লেডজার এন্ট্রিও মুছে যাবে)')) return
+    const tx = transactions.find(t => t.id === id)
     await supabase.from('transactions').delete().eq('id', id)
+    // সংযুক্ত ledger entry মুছি (একই stock, date, এবং amount দিয়ে match করে)
+    if (tx) {
+      const ledgerType = tx.type === 'BUY' ? 'STOCK_BUY' : 'STOCK_SELL'
+      await supabase.from('ledger').delete()
+        .eq('type', ledgerType)
+        .eq('related_stock', tx.stock_name)
+        .eq('date', tx.date)
+        .eq('amount', tx.total_cost)
+    }
     fetchAll()
   }
 
