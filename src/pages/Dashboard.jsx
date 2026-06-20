@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { getMarketStatus, formatTaka } from '../lib/utils'
 import { calcPortfolio } from '../lib/portfolio'
+import { calcLedgerBalance } from '../lib/ledger'
 import { TrendingUp, TrendingDown, DollarSign, BarChart2, Clock, Plus, RefreshCw, Wallet, Layers } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import AddTransactionModal from '../components/AddTransactionModal'
@@ -52,18 +53,26 @@ export default function Dashboard({ onNavigate }) {
   const [period, setPeriod] = useState('weekly')
   const [chartPeriod, setChartPeriod] = useState('30d')
   const [currentPrices, setCurrentPrices] = useState({})
+  const [ledgerBalance, setLedgerBalance] = useState(0)
   const market = getMarketStatus()
 
   useEffect(() => {
     fetchTransactions()
     fetchPrices()
+    fetchLedger()
     const channel = supabase
       .channel('dashboard-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => fetchTransactions())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'current_prices' }, () => fetchPrices())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ledger' }, () => fetchLedger())
       .subscribe()
     return () => supabase.removeChannel(channel)
   }, [])
+
+  async function fetchLedger() {
+    const { data } = await supabase.from('ledger').select('type, amount')
+    setLedgerBalance(calcLedgerBalance(data || []))
+  }
 
   async function fetchTransactions() {
     const { data } = await supabase.from('transactions').select('*').order('date', { ascending: true })
@@ -182,6 +191,11 @@ export default function Dashboard({ onNavigate }) {
       </div>
 
       <div className="stat-grid">
+        <div className="stat-card" style={{ background: 'linear-gradient(135deg, var(--glow-g), var(--glow-b))', borderColor: 'rgba(255,122,69,0.2)', cursor: 'pointer' }} onClick={() => onNavigate && onNavigate('ledger')}>
+          <div className="stat-label">💼 লেডজার ব্যালেন্স</div>
+          <div className="stat-value" style={{ color: ledgerBalance > 0 ? 'var(--text)' : 'var(--red)' }}>{formatTaka(ledgerBalance)}</div>
+          <div className="stat-sub" style={{ textDecoration: 'underline' }}>লেডজার দেখুন →</div>
+        </div>
         <div className="stat-card blue">
           <div className="stat-label"><Wallet size={11} style={{display:'inline', marginRight: 4}} />মোট বিনিয়োগ</div>
           <div className="stat-value">{formatTaka(totalBought)}</div>
