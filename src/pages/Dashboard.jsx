@@ -8,6 +8,7 @@ import { TrendingUp, TrendingDown, DollarSign, BarChart2, Clock, Plus, RefreshCw
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import AddTransactionModal from '../components/AddTransactionModal'
 import CurrentPriceModal from '../components/CurrentPriceModal'
+import LedgerEntryModal from '../components/LedgerEntryModal'
 
 const COLORS = ['#ff7a45', '#6366f1', '#22c55e', '#f5a524', '#ec4899', '#06b6d4']
 
@@ -50,6 +51,8 @@ export default function Dashboard({ onNavigate }) {
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [showPriceModal, setShowPriceModal] = useState(false)
+  const [showLedgerModal, setShowLedgerModal] = useState(false)
+  const [ledgerModalType, setLedgerModalType] = useState('CASH_IN')
   const [period, setPeriod] = useState('weekly')
   const [chartPeriod, setChartPeriod] = useState('30d')
   const [currentPrices, setCurrentPrices] = useState({})
@@ -220,10 +223,10 @@ export default function Dashboard({ onNavigate }) {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-            <button className="btn btn-buy btn-sm" style={{ flex: 1, justifyContent: 'center' }} onClick={() => onNavigate && onNavigate('ledger')}>
+            <button className="btn btn-buy btn-sm" style={{ flex: 1, justifyContent: 'center' }} onClick={() => { setLedgerModalType('CASH_IN'); setShowLedgerModal(true) }}>
               <ArrowDownCircle size={13} /> ক্যাশ ইন
             </button>
-            <button className="btn btn-sell btn-sm" style={{ flex: 1, justifyContent: 'center' }} onClick={() => onNavigate && onNavigate('ledger')}>
+            <button className="btn btn-sell btn-sm" style={{ flex: 1, justifyContent: 'center' }} onClick={() => { setLedgerModalType('CASH_OUT'); setShowLedgerModal(true) }}>
               <ArrowUpCircle size={13} /> ক্যাশ আউট
             </button>
           </div>
@@ -453,6 +456,13 @@ export default function Dashboard({ onNavigate }) {
           prices={currentPrices}
           onSave={savePrices}
           onClose={() => setShowPriceModal(false)}
+        />
+      )}
+      {showLedgerModal && (
+        <LedgerEntryModal
+          initialType={ledgerModalType}
+          onClose={() => setShowLedgerModal(false)}
+          onSaved={fetchLedger}
         />
       )}
     </div>
