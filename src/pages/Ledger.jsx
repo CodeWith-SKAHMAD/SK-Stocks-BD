@@ -2,18 +2,20 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { getLedgerSummary } from '../lib/ledger'
 import { formatTaka } from '../lib/utils'
-import { Plus, X, Trash2, Wallet, ArrowDownCircle, ArrowUpCircle, Receipt, Image as ImageIcon, TrendingUp, TrendingDown } from 'lucide-react'
+import { Plus, X, Trash2, Edit2, Wallet, ArrowDownCircle, ArrowUpCircle, Receipt, Image as ImageIcon, TrendingUp, TrendingDown } from 'lucide-react'
 
 export default function Ledger() {
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
+  const [editingId, setEditingId] = useState(null)
   const [type, setType] = useState('CASH_IN')
   const [amount, setAmount] = useState('')
   const [note, setNote] = useState('')
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
   const [receiptFile, setReceiptFile] = useState(null)
   const [receiptPreview, setReceiptPreview] = useState(null)
+  const [existingReceiptUrl, setExistingReceiptUrl] = useState(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [filter, setFilter] = useState('ALL')
@@ -34,8 +36,18 @@ export default function Ledger() {
   }
 
   function openNew(t) {
+    setEditingId(null)
     setType(t); setAmount(''); setNote(''); setDate(new Date().toISOString().split('T')[0])
-    setReceiptFile(null); setReceiptPreview(null); setError('')
+    setReceiptFile(null); setReceiptPreview(null); setExistingReceiptUrl(null); setError('')
+    setShowModal(true)
+  }
+
+  function openEdit(entry) {
+    setEditingId(entry.id)
+    setType(entry.type); setAmount(String(entry.amount)); setNote(entry.note || '')
+    setDate(entry.date)
+    setReceiptFile(null); setReceiptPreview(null); setExistingReceiptUrl(entry.receipt_url)
+    setError('')
     setShowModal(true)
   }
 
@@ -53,7 +65,7 @@ export default function Ledger() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setError('লগইন করুন'); setSaving(false); return }
 
-    let receiptUrl = null
+    let receiptUrl = existingReceiptUrl
     if (receiptFile) {
       const ext = receiptFile.name.split('.').pop()
       const path = `${user.id}/${Date.now()}.${ext}`
@@ -64,12 +76,21 @@ export default function Ledger() {
       }
     }
 
-    const { error: err } = await supabase.from('ledger').insert({
-      user_id: user.id, type, amount: Number(amount), note, date,
-      receipt_url: receiptUrl
-    })
-    if (err) setError(err.message)
-    else { setShowModal(false); fetchEntries() }
+    if (editingId) {
+      const { error: err } = await supabase.from('ledger').update({
+        type, amount: Number(amount), note, date, receipt_url: receiptUrl
+      }).eq('id', editingId)
+      if (err) { setError(err.message); setSaving(false); return }
+    } else {
+      const { error: err } = await supabase.from('ledger').insert({
+        user_id: user.id, type, amount: Number(amount), note, date,
+        receipt_url: receiptUrl
+      })
+      if (err) { setError(err.message); setSaving(false); return }
+    }
+
+    setShowModal(false)
+    fetchEntries()
     setSaving(false)
   }
 
@@ -190,7 +211,12 @@ export default function Ledger() {
                       ) : <span style={{ color: 'var(--text3)', fontSize: 11 }}>—</span>}
                     </td>
                     <td>
-                      <button className="btn btn-danger btn-sm" onClick={() => deleteEntry(e.id, e.type)}><Trash2 size={11} /></button>
+                      <div style={{ display: 'flex', gap: 5 }}>
+                        {(e.type === 'CASH_IN' || e.type === 'CASH_OUT') && (
+                          <button className="btn btn-ghost btn-sm" onClick={() => openEdit(e)}><Edit2 size={11} /></button>
+                        )}
+                        <button className="btn btn-danger btn-sm" onClick={() => deleteEntry(e.id, e.type)}><Trash2 size={11} /></button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -206,7 +232,7 @@ export default function Ledger() {
           <div className="modal">
             <div className="modal-header">
               <h3 style={{ fontSize: 17, fontWeight: 800 }}>
-                {type === 'CASH_IN' ? '💰 ক্যাশ ইন করুন' : '💸 ক্যাশ আউট করুন'}
+                {editingId ? '✏️ এন্ট্রি সম্পাদনা' : (type === 'CASH_IN' ? '💰 ক্যাশ ইন করুন' : '💸 ক্যাশ আউট করুন')}
               </h3>
               <button className="icon-btn" onClick={() => setShowModal(false)}><X size={16} /></button>
             </div>
@@ -237,10 +263,10 @@ export default function Ledger() {
 
               <div className="form-group">
                 <label className="form-label">মানি রিসিট (ঐচ্ছিক)</label>
-                {receiptPreview ? (
+                {(receiptPreview || existingReceiptUrl) ? (
                   <div style={{ position: 'relative' }}>
-                    <img src={receiptPreview} alt="" style={{ width: '100%', maxHeight: 160, objectFit: 'cover', borderRadius: 10 }} />
-                    <button onClick={() => { setReceiptFile(null); setReceiptPreview(null) }}
+                    <img src={receiptPreview || existingReceiptUrl} alt="" style={{ width: '100%', maxHeight: 160, objectFit: 'cover', borderRadius: 10 }} />
+                    <button onClick={() => { setReceiptFile(null); setReceiptPreview(null); setExistingReceiptUrl(null) }}
                       style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: 6, color: '#fff', padding: 6, cursor: 'pointer' }}>
                       <X size={14} />
                     </button>
@@ -258,7 +284,7 @@ export default function Ledger() {
             <div className="modal-footer">
               <button className="btn btn-ghost" onClick={() => setShowModal(false)}>বাতিল</button>
               <button className={type === 'CASH_IN' ? 'btn btn-primary' : 'btn'} style={type === 'CASH_OUT' ? { background: 'var(--red)', color: '#fff' } : {}} onClick={handleSave} disabled={saving}>
-                {saving ? '⏳ সংরক্ষণ হচ্ছে...' : '✅ সংরক্ষণ করুন'}
+                {saving ? '⏳ সংরক্ষণ হচ্ছে...' : (editingId ? '✅ আপডেট করুন' : '✅ সংরক্ষণ করুন')}
               </button>
             </div>
           </div>

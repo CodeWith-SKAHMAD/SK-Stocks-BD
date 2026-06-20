@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth'
 import { getMarketStatus, formatTaka } from '../lib/utils'
 import { calcPortfolio } from '../lib/portfolio'
 import { calcLedgerBalance } from '../lib/ledger'
-import { TrendingUp, TrendingDown, DollarSign, BarChart2, Clock, Plus, RefreshCw, Wallet, Layers } from 'lucide-react'
+import { TrendingUp, TrendingDown, DollarSign, BarChart2, Clock, Plus, RefreshCw, Wallet, Layers, ArrowDownCircle, ArrowUpCircle } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import AddTransactionModal from '../components/AddTransactionModal'
 import CurrentPriceModal from '../components/CurrentPriceModal'
@@ -190,37 +190,60 @@ export default function Dashboard({ onNavigate }) {
         </div>
       </div>
 
-      <div className="stat-grid">
-        <div className="stat-card" style={{ background: 'linear-gradient(135deg, var(--glow-g), var(--glow-b))', borderColor: 'rgba(255,122,69,0.2)', cursor: 'pointer' }} onClick={() => onNavigate && onNavigate('ledger')}>
-          <div className="stat-label">💼 লেডজার ব্যালেন্স</div>
-          <div className="stat-value" style={{ color: ledgerBalance > 0 ? 'var(--text)' : 'var(--red)' }}>{formatTaka(ledgerBalance)}</div>
-          <div className="stat-sub" style={{ textDecoration: 'underline' }}>লেডজার দেখুন →</div>
-        </div>
-        <div className="stat-card blue">
-          <div className="stat-label"><Wallet size={11} style={{display:'inline', marginRight: 4}} />মোট বিনিয়োগ</div>
-          <div className="stat-value">{formatTaka(totalBought)}</div>
-          <div className="stat-sub"><BarChart2 size={12} /> {transactions.filter(t => t.type === 'BUY').length}টি কেনা</div>
-        </div>
-        <div className="stat-card yellow">
-          <div className="stat-label"><Layers size={11} style={{display:'inline', marginRight: 4}} />সক্রিয় হোল্ডিং</div>
-          <div className="stat-value">{formatTaka(totalInvested)}</div>
-          <div className="stat-sub">{holdingList.length}টি স্টক হাতে</div>
-        </div>
-        <div className={`stat-card ${totalUnrealized >= 0 ? 'green' : 'red'}`}>
-          <div className="stat-label">📊 Unrealized P&L</div>
-          <div className={`stat-value ${totalUnrealized >= 0 ? 'profit' : 'loss'}`}>
-            {hasPrices ? `${totalUnrealized >= 0 ? '+' : ''}${formatTaka(totalUnrealized)}` : '—'}
+      <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 14, marginBottom: 20 }} className="dashboard-ledger-grid">
+        {/* BIG Ledger Card */}
+        <div className="card" style={{
+          background: 'linear-gradient(135deg, var(--glow-g), var(--glow-b))',
+          borderColor: 'rgba(34,197,94,0.2)',
+          display: 'flex', flexDirection: 'column', justifyContent: 'space-between'
+        }}>
+          <div>
+            <div className="stat-label">💼 লেডজার ব্যালেন্স</div>
+            <div className="stat-value" style={{ fontSize: 30, color: ledgerBalance > 0 ? 'var(--text)' : 'var(--red)' }}>
+              {formatTaka(ledgerBalance)}
+            </div>
+            <div className="stat-sub" onClick={() => onNavigate && onNavigate('ledger')} style={{ cursor: 'pointer', textDecoration: 'underline', marginTop: 6 }}>
+              পুরো লেডজার দেখুন →
+            </div>
           </div>
-          <div className="stat-sub" onClick={() => onNavigate && onNavigate('unrealized-report')} style={{ cursor: 'pointer', textDecoration: 'underline' }}>
-            {hasPrices ? 'রিপোর্ট দেখুন →' : 'দাম আপডেট করুন'}
+          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+            <button className="btn btn-buy btn-sm" style={{ flex: 1, justifyContent: 'center' }} onClick={() => onNavigate && onNavigate('ledger')}>
+              <ArrowDownCircle size={13} /> ক্যাশ ইন
+            </button>
+            <button className="btn btn-sell btn-sm" style={{ flex: 1, justifyContent: 'center' }} onClick={() => onNavigate && onNavigate('ledger')}>
+              <ArrowUpCircle size={13} /> ক্যাশ আউট
+            </button>
           </div>
         </div>
-        <div className={`stat-card ${totalRealizedPL >= 0 ? 'green' : 'red'}`}>
-          <div className="stat-label">Realized P&L</div>
-          <div className={`stat-value ${totalRealizedPL >= 0 ? 'profit' : 'loss'}`}>
-            {totalRealizedPL >= 0 ? '+' : '-'}{formatTaka(Math.abs(totalRealizedPL))}
+
+        {/* 4 small cards 2x2 */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }} className="dashboard-small-stats">
+          <div className="stat-card blue">
+            <div className="stat-label"><Wallet size={11} style={{display:'inline', marginRight: 4}} />মোট বিনিয়োগ</div>
+            <div className="stat-value">{formatTaka(totalBought)}</div>
+            <div className="stat-sub"><BarChart2 size={12} /> {transactions.filter(t => t.type === 'BUY').length}টি কেনা</div>
           </div>
-          <div className="stat-sub">{totalRealizedPL >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}বিক্রয় থেকে</div>
+          <div className="stat-card yellow">
+            <div className="stat-label"><Layers size={11} style={{display:'inline', marginRight: 4}} />সক্রিয় হোল্ডিং</div>
+            <div className="stat-value">{formatTaka(totalInvested)}</div>
+            <div className="stat-sub">{holdingList.length}টি স্টক হাতে</div>
+          </div>
+          <div className={`stat-card ${totalUnrealized >= 0 ? 'green' : 'red'}`}>
+            <div className="stat-label">📊 Unrealized P&L</div>
+            <div className={`stat-value ${totalUnrealized >= 0 ? 'profit' : 'loss'}`}>
+              {hasPrices ? `${totalUnrealized >= 0 ? '+' : ''}${formatTaka(totalUnrealized)}` : '—'}
+            </div>
+            <div className="stat-sub" onClick={() => onNavigate && onNavigate('unrealized-report')} style={{ cursor: 'pointer', textDecoration: 'underline' }}>
+              {hasPrices ? 'রিপোর্ট দেখুন →' : 'দাম আপডেট করুন'}
+            </div>
+          </div>
+          <div className={`stat-card ${totalRealizedPL >= 0 ? 'green' : 'red'}`}>
+            <div className="stat-label">Realized P&L</div>
+            <div className={`stat-value ${totalRealizedPL >= 0 ? 'profit' : 'loss'}`}>
+              {totalRealizedPL >= 0 ? '+' : '-'}{formatTaka(Math.abs(totalRealizedPL))}
+            </div>
+            <div className="stat-sub">{totalRealizedPL >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}বিক্রয় থেকে</div>
+          </div>
         </div>
       </div>
 
