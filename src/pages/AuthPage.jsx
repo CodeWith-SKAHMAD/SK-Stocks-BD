@@ -35,7 +35,8 @@ export default function AuthPage() {
       <div className="auth-bg" />
       <div className="auth-card fade-up">
         <div className="auth-logo">
-          <h1>📈 BD Stock</h1>
+          <img src="/SK-Stocks-BD/logo-icon.png" alt="BD Stock" style={{ width: 64, height: 64, borderRadius: 14, margin: '0 auto 12px', display: 'block' }} />
+          <h1>BD Stock</h1>
           <p>বাংলাদেশ স্টক ইনভেস্টমেন্ট ট্র্যাকার</p>
         </div>
 
