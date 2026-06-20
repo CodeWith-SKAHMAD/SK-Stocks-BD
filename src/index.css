@@ -185,13 +185,13 @@ body::before {
 .topbar {
   background: var(--glass2);
   border-bottom: 1px solid var(--border);
-  padding: 13px 22px;
+  padding: 14px 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   position: sticky; top: 0; z-index: 50;
-  backdrop-filter: blur(20px) saturate(1.5);
-  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  backdrop-filter: blur(24px) saturate(1.6);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
 }
 
 .topbar-left { display: flex; align-items: center; gap: 10px; }
@@ -699,4 +699,14 @@ tbody tr:last-child td { border-bottom: none; }
 }
 @media (max-width: 700px) {
   .dashboard-charts-grid { grid-template-columns: 1fr !important; }
+}
+
+/* ═══════════════════════════════════
+   LEDGER DASHBOARD GRID
+═══════════════════════════════════ */
+@media (max-width: 900px) {
+  .dashboard-ledger-grid { grid-template-columns: 1fr !important; }
+}
+@media (max-width: 480px) {
+  .dashboard-small-stats { grid-template-columns: 1fr !important; }
 }
