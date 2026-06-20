@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth'
 import { getMarketStatus, formatTaka } from '../lib/utils'
 import { calcPortfolio } from '../lib/portfolio'
 import { calcLedgerBalance } from '../lib/ledger'
-import { TrendingUp, TrendingDown, DollarSign, BarChart2, Clock, Plus, RefreshCw, Wallet, Layers, ArrowDownCircle, ArrowUpCircle } from 'lucide-react'
+import { TrendingUp, TrendingDown, DollarSign, BarChart2, Clock, Plus, RefreshCw, Wallet, Layers, ArrowDownCircle, ArrowUpCircle, Eye, EyeOff } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import AddTransactionModal from '../components/AddTransactionModal'
 import CurrentPriceModal from '../components/CurrentPriceModal'
@@ -54,6 +54,7 @@ export default function Dashboard({ onNavigate }) {
   const [chartPeriod, setChartPeriod] = useState('30d')
   const [currentPrices, setCurrentPrices] = useState({})
   const [ledgerBalance, setLedgerBalance] = useState(0)
+  const [hideBalance, setHideBalance] = useState(() => localStorage.getItem('bd_hide_balance') === 'true')
   const market = getMarketStatus()
 
   useEffect(() => {
@@ -154,6 +155,13 @@ export default function Dashboard({ onNavigate }) {
     return result
   }
 
+  function toggleHideBalance() {
+    setHideBalance(prev => {
+      localStorage.setItem('bd_hide_balance', String(!prev))
+      return !prev
+    })
+  }
+
   const periodPL = getPeriodPL()
   const chartData = getChartData()
   const firstName = profile?.full_name?.split(' ')[0] || 'বিনিয়োগকারী'
@@ -198,9 +206,14 @@ export default function Dashboard({ onNavigate }) {
           display: 'flex', flexDirection: 'column', justifyContent: 'space-between'
         }}>
           <div>
-            <div className="stat-label">💼 লেডজার ব্যালেন্স</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div className="stat-label">💼 লেডজার ব্যালেন্স</div>
+              <button onClick={toggleHideBalance} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text2)', padding: 4, display: 'flex' }}>
+                {hideBalance ? <EyeOff size={15} /> : <Eye size={15} />}
+              </button>
+            </div>
             <div className="stat-value" style={{ fontSize: 30, color: ledgerBalance > 0 ? 'var(--text)' : 'var(--red)' }}>
-              {formatTaka(ledgerBalance)}
+              {hideBalance ? '৳ ••••••' : formatTaka(ledgerBalance)}
             </div>
             <div className="stat-sub" onClick={() => onNavigate && onNavigate('ledger')} style={{ cursor: 'pointer', textDecoration: 'underline', marginTop: 6 }}>
               পুরো লেডজার দেখুন →
