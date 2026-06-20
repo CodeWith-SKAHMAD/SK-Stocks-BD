@@ -14,7 +14,7 @@ import Ledger from './pages/Ledger'
 import AddTransactionModal from './components/AddTransactionModal'
 import {
   LayoutDashboard, BarChart2, TrendingUp, Calculator as CalcIcon,
-  Zap, FileText, StickyNote, Wallet, Sun, Moon, Menu, X, Plus, LogOut
+  Zap, FileText, StickyNote, Wallet, Sun, Moon, Menu, X, Plus, LogOut, User
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
 
@@ -30,11 +30,30 @@ const NAV = [
   { id: 'unrealized-report', label: 'Unrealized P&L', icon: TrendingUp },
 ]
 
+// Mobile bottom bar — সবচেয়ে দরকারি ৫টা (৪টা + More)
+const MOBILE_NAV = [
+  { id: 'dashboard', label: 'হোম', icon: LayoutDashboard },
+  { id: 'ledger', label: 'লেডজার', icon: Wallet },
+  { id: 'portfolio', label: 'পোর্টফোলিও', icon: BarChart2 },
+  { id: 'market', label: 'মার্কেট', icon: TrendingUp },
+  { id: 'more', label: 'আরও', icon: Menu },
+]
+
+// "More" শীটে বাকি সব ট্যাব
+const MORE_NAV = [
+  { id: 'calculator', label: 'ক্যালকুলেটর', icon: CalcIcon },
+  { id: 'signals', label: 'সিগন্যাল', icon: Zap },
+  { id: 'report', label: 'রিপোর্ট', icon: FileText },
+  { id: 'notes', label: 'নোট', icon: StickyNote },
+  { id: 'unrealized-report', label: 'Unrealized', icon: TrendingUp },
+]
+
 function AppInner() {
   const { user, profile, loading } = useAuth()
   const [page, setPage] = useState('dashboard')
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
 
   useEffect(() => {
@@ -157,9 +176,6 @@ function AppInner() {
         {/* Topbar */}
         <header className="topbar">
           <div className="topbar-left">
-            <button className="mobile-menu-btn" onClick={() => setSidebarOpen(true)}>
-              <Menu size={18} />
-            </button>
             <span className="topbar-title">{PAGE_TITLES[page]}</span>
           </div>
           <div className="topbar-right">
@@ -183,6 +199,56 @@ function AppInner() {
       </main>
 
       {showAddModal && <AddTransactionModal onClose={() => setShowAddModal(false)} />}
+
+      {/* Mobile Bottom Navigation */}
+      <nav className="mobile-bottom-nav">
+        {MOBILE_NAV.map(item => {
+          const Icon = item.icon
+          return (
+            <button
+              key={item.id}
+              className={`mobile-nav-item ${page === item.id ? 'active' : ''}`}
+              onClick={() => item.id === 'more' ? setShowMoreMenu(true) : setPage(item.id)}
+            >
+              <Icon size={20} />
+              <span>{item.label}</span>
+            </button>
+          )
+        })}
+      </nav>
+
+      {/* Mobile "More" Menu */}
+      {showMoreMenu && (
+        <div className="sidebar-overlay open" onClick={() => setShowMoreMenu(false)} style={{ zIndex: 200 }}>
+          <div className="mobile-more-sheet" onClick={e => e.stopPropagation()}>
+            <div className="mobile-more-handle" />
+            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 14, paddingLeft: 4 }}>আরও</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {MORE_NAV.map(item => {
+                const Icon = item.icon
+                return (
+                  <button
+                    key={item.id}
+                    className={`nav-item ${page === item.id ? 'active' : ''}`}
+                    style={{ flexDirection: 'column', alignItems: 'flex-start', height: 64, justifyContent: 'center', gap: 6 }}
+                    onClick={() => { setPage(item.id); setShowMoreMenu(false) }}
+                  >
+                    <Icon size={18} />
+                    {item.label}
+                  </button>
+                )
+              })}
+              <button
+                className="nav-item"
+                style={{ flexDirection: 'column', alignItems: 'flex-start', height: 64, justifyContent: 'center', gap: 6 }}
+                onClick={() => { setPage('profile'); setShowMoreMenu(false) }}
+              >
+                <User size={18} /> প্রোফাইল
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
