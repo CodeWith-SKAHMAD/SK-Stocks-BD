@@ -10,15 +10,17 @@ import ProfilePage from './pages/Profile'
 import Report from './pages/Report'
 import Notes from './pages/Notes'
 import UnrealizedReport from './pages/UnrealizedReport'
+import Ledger from './pages/Ledger'
 import AddTransactionModal from './components/AddTransactionModal'
 import {
   LayoutDashboard, BarChart2, TrendingUp, Calculator as CalcIcon,
-  Zap, FileText, StickyNote, Sun, Moon, Menu, X, Plus, LogOut
+  Zap, FileText, StickyNote, Wallet, Sun, Moon, Menu, X, Plus, LogOut
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
 
 const NAV = [
   { id: 'dashboard', label: 'ড্যাশবোর্ড', icon: LayoutDashboard },
+  { id: 'ledger', label: 'লেডজার', icon: Wallet },
   { id: 'portfolio', label: 'পোর্টফোলিও', icon: BarChart2 },
   { id: 'market', label: 'স্টক মার্কেট', icon: TrendingUp },
   { id: 'calculator', label: 'ক্যালকুলেটর', icon: CalcIcon },
@@ -66,6 +68,7 @@ function AppInner() {
 
   const PAGE_TITLES = {
     dashboard: '🏠 ড্যাশবোর্ড',
+    ledger: '📒 লেডজার',
     portfolio: '📊 পোর্টফোলিও',
     market: '📈 স্টক মার্কেট',
     calculator: '🧮 ক্যালকুলেটর',
@@ -79,6 +82,7 @@ function AppInner() {
   function renderPage() {
     switch (page) {
       case 'dashboard': return <Dashboard onNavigate={setPage} />
+      case 'ledger': return <Ledger />
       case 'portfolio': return <Portfolio />
       case 'market': return <StockMarket />
       case 'calculator': return <Calculator />
