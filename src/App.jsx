@@ -102,9 +102,12 @@ function AppInner() {
 
       {/* Sidebar */}
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
-        <div className="sidebar-logo">
-          <h1>📈 BD Stock</h1>
-          <span>বিনিয়োগ ট্র্যাকার</span>
+        <div className="sidebar-logo" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <img src="/SK-Stocks-BD/logo-icon.png" alt="BD Stock" style={{ width: 34, height: 34, borderRadius: 8, flexShrink: 0 }} />
+          <div>
+            <h1 style={{ marginBottom: 0 }}>BD Stock</h1>
+            <span>বিনিয়োগ ট্র্যাকার</span>
+          </div>
         </div>
 
         <nav className="sidebar-nav">
