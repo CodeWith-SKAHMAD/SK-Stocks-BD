@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { DSE_STOCKS, CSE_STOCKS } from '../lib/utils'
-import { X, Info, TrendingUp, TrendingDown, Calendar, Hash, Coins } from 'lucide-react'
+import { DSE_STOCKS, CSE_STOCKS, formatTaka } from '../lib/utils'
+import { calcLedgerBalance } from '../lib/ledger'
+import { X, Info, TrendingUp, TrendingDown, Calendar, Hash, Coins, Wallet } from 'lucide-react'
 
 export default function AddTransactionModal({ onClose, prefill }) {
   const [type, setType] = useState(prefill?.type || 'BUY')
@@ -14,6 +15,7 @@ export default function AddTransactionModal({ onClose, prefill }) {
   const [error, setError] = useState('')
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [holdings, setHoldings] = useState({})
+  const [ledgerBalance, setLedgerBalance] = useState(0)
 
   const stocks = exchange === 'DSE' ? DSE_STOCKS : CSE_STOCKS
   const filtered = stocks.filter(s =>
@@ -23,8 +25,9 @@ export default function AddTransactionModal({ onClose, prefill }) {
 
   const totalCost = quantity && price ? (Number(quantity) * Number(price)) : 0
   const availableQty = holdings[stockName] || 0
+  const insufficientFunds = type === 'BUY' && totalCost > ledgerBalance
 
-  useEffect(() => { fetchHoldings() }, [])
+  useEffect(() => { fetchHoldings(); fetchLedgerBalance() }, [])
 
   async function fetchHoldings() {
     const { data } = await supabase.from('transactions').select('stock_name, quantity, type')
@@ -38,15 +41,26 @@ export default function AddTransactionModal({ onClose, prefill }) {
     setHoldings(map)
   }
 
+  async function fetchLedgerBalance() {
+    const { data } = await supabase.from('ledger').select('type, amount')
+    setLedgerBalance(calcLedgerBalance(data || []))
+  }
+
   async function handleSubmit() {
     if (!stockName || !quantity || !price || !date) { setError('সব তথ্য পূরণ করুন'); return }
     if (type === 'SELL' && Number(quantity) > availableQty) {
       setError(`আপনার কাছে মাত্র ${availableQty}টি ${stockName} শেয়ার আছে!`)
       return
     }
+    if (type === 'BUY' && totalCost > ledgerBalance) {
+      setError(`লেডজারে পর্যাপ্ত টাকা নেই! এভেইলেবল: ${formatTaka(ledgerBalance)}`)
+      return
+    }
     setLoading(true); setError('')
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setError('লগইন করুন'); setLoading(false); return }
+
+    // ট্রানজেকশন তৈরি
     const { error: err } = await supabase.from('transactions').insert({
       user_id: user.id, type, exchange,
       stock_name: stockName,
@@ -54,8 +68,18 @@ export default function AddTransactionModal({ onClose, prefill }) {
       price: Number(price),
       date
     })
-    if (err) setError(err.message)
-    else onClose()
+    if (err) { setError(err.message); setLoading(false); return }
+
+    // লেডজার এন্ট্রি তৈরি — BUY হলে টাকা কাটবে, SELL হলে যুক্ত হবে
+    await supabase.from('ledger').insert({
+      user_id: user.id,
+      type: type === 'BUY' ? 'STOCK_BUY' : 'STOCK_SELL',
+      amount: totalCost,
+      related_stock: stockName,
+      date
+    })
+
+    onClose()
     setLoading(false)
   }
 
@@ -71,6 +95,20 @@ export default function AddTransactionModal({ onClose, prefill }) {
         </div>
 
         <div className="modal-body">
+          {/* Ledger Balance Info */}
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            background: 'var(--glass)', border: '1px solid var(--border)', borderRadius: 12,
+            padding: '10px 14px', marginBottom: 16
+          }}>
+            <span style={{ fontSize: 12, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Wallet size={13} /> লেডজার ব্যালেন্স
+            </span>
+            <span style={{ fontWeight: 800, fontSize: 15, color: ledgerBalance > 0 ? 'var(--green)' : 'var(--red)' }}>
+              {formatTaka(ledgerBalance)}
+            </span>
+          </div>
+
           {/* BUY/SELL Pill Toggle */}
           <div className="tx-type-toggle" style={{ marginBottom: 20 }}>
             <button
@@ -132,8 +170,8 @@ export default function AddTransactionModal({ onClose, prefill }) {
           {/* Available shares info for SELL */}
           {type === 'SELL' && stockName && (
             <div style={{
-              background: availableQty > 0 ? 'rgba(52,211,153,0.06)' : 'rgba(251,113,133,0.06)',
-              border: `1px solid ${availableQty > 0 ? 'rgba(52,211,153,0.18)' : 'rgba(251,113,133,0.18)'}`,
+              background: availableQty > 0 ? 'rgba(22,163,74,0.06)' : 'rgba(226,58,78,0.06)',
+              border: `1px solid ${availableQty > 0 ? 'rgba(22,163,74,0.18)' : 'rgba(226,58,78,0.18)'}`,
               borderRadius: 'var(--radius-xs)', padding: '10px 14px', marginBottom: 14,
               display: 'flex', alignItems: 'center', gap: 8
             }}>
@@ -173,8 +211,15 @@ export default function AddTransactionModal({ onClose, prefill }) {
             </span>
           </div>
 
+          {/* Insufficient funds warning */}
+          {insufficientFunds && (
+            <div style={{ marginTop: 12, padding: '10px 14px', background: 'rgba(226,58,78,0.08)', borderRadius: 'var(--radius-xs)', border: '1px solid rgba(226,58,78,0.18)', fontSize: 12.5, color: 'var(--red)', fontWeight: 600 }}>
+              ⚠️ লেডজারে পর্যাপ্ত টাকা নেই। আগে "লেডজার" থেকে ক্যাশ ইন করুন।
+            </div>
+          )}
+
           {error && (
-            <div style={{ color: 'var(--red)', fontSize: 13, marginTop: 12, padding: '10px 14px', background: 'rgba(251,113,133,0.08)', borderRadius: 'var(--radius-xs)', border: '1px solid rgba(251,113,133,0.15)' }}>
+            <div style={{ color: 'var(--red)', fontSize: 13, marginTop: 12, padding: '10px 14px', background: 'rgba(226,58,78,0.08)', borderRadius: 'var(--radius-xs)', border: '1px solid rgba(226,58,78,0.15)' }}>
               ⚠️ {error}
             </div>
           )}
@@ -184,7 +229,7 @@ export default function AddTransactionModal({ onClose, prefill }) {
           <button className="btn btn-ghost" onClick={onClose}>বাতিল</button>
           <button className={`btn ${type === 'BUY' ? 'btn-primary' : ''}`}
             style={type === 'SELL' ? { background: 'var(--red)', color: '#fff' } : {}}
-            onClick={handleSubmit} disabled={loading}>
+            onClick={handleSubmit} disabled={loading || insufficientFunds}>
             {loading ? '⏳ সংরক্ষণ হচ্ছে...' : `✅ ${type === 'BUY' ? 'কেনা' : 'বেচা'} যোগ করুন`}
           </button>
         </div>
