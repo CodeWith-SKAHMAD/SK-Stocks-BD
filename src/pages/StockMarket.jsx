@@ -24,6 +24,7 @@ export default function StockMarket() {
   const [newStockCode, setNewStockCode] = useState('')
   const [newStockName, setNewStockName] = useState('')
   const [newStockSector, setNewStockSector] = useState('')
+  const [chartSource, setChartSource] = useState('tradingview')
   const chartRef = useRef(null)
 
   const builtinStocks = exchange === 'DSE' ? DSE_STOCKS : CSE_STOCKS
@@ -54,7 +55,7 @@ export default function StockMarket() {
     return () => supabase.removeChannel(channel)
   }, [])
 
-  useEffect(() => { if (selected) loadChart() }, [selected])
+  useEffect(() => { if (selected && chartSource === 'tradingview') loadChart() }, [selected, chartSource])
 
   async function fetchWatchlists() {
     const { data: wls } = await supabase.from('watchlists').select('*').order('created_at')
@@ -374,14 +375,46 @@ export default function StockMarket() {
             </div>
           )}
 
-          <div className="stock-chart-box">
-            <div ref={chartRef} style={{ width: '100%', height: '100%' }} />
+          <div className="tabs" style={{ marginBottom: 0 }}>
+            <button className={`tab ${chartSource === 'tradingview' ? 'active' : ''}`} onClick={() => setChartSource('tradingview')}>📈 TradingView চার্ট</button>
+            <button className={`tab ${chartSource === 'dse' ? 'active' : ''}`} onClick={() => setChartSource('dse')}>🏛️ DSE অফিসিয়াল পেজ</button>
           </div>
 
+          {chartSource === 'tradingview' ? (
+            <div className="stock-chart-box">
+              <div ref={chartRef} style={{ width: '100%', height: '100%' }} />
+            </div>
+          ) : (
+            <div className="stock-chart-box" style={{ position: 'relative' }}>
+              <iframe
+                key={selected?.code}
+                src={`https://www.dsebd.org/displayCompany.php?name=${selected?.code}`}
+                title="DSE Official"
+                style={{ width: '100%', height: '100%', border: 'none' }}
+              />
+              <a
+                href={`https://www.dsebd.org/displayCompany.php?name=${selected?.code}`}
+                target="_blank" rel="noreferrer"
+                style={{
+                  position: 'absolute', top: 10, right: 10, fontSize: 11,
+                  background: 'var(--glass2)', border: '1px solid var(--border2)',
+                  padding: '5px 10px', borderRadius: 8, color: 'var(--text2)',
+                  textDecoration: 'none', backdropFilter: 'blur(8px)'
+                }}
+              >
+                পেজ ফাঁকা দেখলে এখানে চাপুন ↗
+              </a>
+            </div>
+          )}
+
           <div style={{ fontSize: 11, color: 'var(--text3)', textAlign: 'center', lineHeight: 1.5 }}>
-            চার্ট TradingView দ্বারা পরিচালিত (DSEBD এক্সচেঞ্জ ডেটা)। কিছু নতুন বা কম পরিচিত স্টক TradingView-এ এখনো যুক্ত হয়নি।
+            {chartSource === 'tradingview' ? (
+              <>চার্ট TradingView দ্বারা পরিচালিত (DSEBD এক্সচেঞ্জ ডেটা)। কিছু স্টকের ডেটা TradingView-এর নিয়মে free embed-এ নাও দেখাতে পারে।</>
+            ) : (
+              <>সরাসরি DSE-এর অফিসিয়াল ওয়েবসাইট থেকে। যদি ফাঁকা দেখায়, dsebd.org নতুন ট্যাবে খুলুন।</>
+            )}
             <br />
-            💡 চার্ট না দেখালে Dashboard থেকে "দাম আপডেট" দিয়ে ম্যানুয়ালি দাম দিন।
+            💡 দাম জানতে Dashboard থেকে "দাম আপডেট" দিয়ে ম্যানুয়ালি দাম দিন।
           </div>
         </div>
       </div>
