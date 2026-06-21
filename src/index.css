@@ -776,3 +776,140 @@ tbody tr:last-child td { border-bottom: none; }
   .page-content { padding-bottom: 78px !important; }
   .sidebar { display: none; }
 }
+
+/* ═══════════════════════════════════
+   STOCK MARKET PAGE — RESPONSIVE
+═══════════════════════════════════ */
+.stock-market-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: calc(100vh - 76px);
+}
+
+.stock-market-layout {
+  display: flex;
+  gap: 14px;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+.stock-market-sidebar {
+  width: 270px;
+  min-width: 270px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.stock-list-scroll {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-height: 200px;
+}
+
+.stock-market-chart-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  width: 100%;
+}
+
+.stock-chart-box {
+  flex: 1;
+  min-height: 380px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  backdrop-filter: blur(16px) saturate(1.5);
+}
+
+@media (max-width: 900px) {
+  .stock-market-layout {
+    flex-direction: column;
+  }
+  .stock-market-sidebar {
+    width: 100%;
+    min-width: 0;
+  }
+  .stock-list-scroll {
+    max-height: 280px;
+  }
+  .stock-chart-box {
+    min-height: 320px;
+  }
+}
+
+@media (max-width: 480px) {
+  .stock-market-page { padding: 0; }
+  .stock-market-layout { gap: 10px; }
+  .stock-chart-box { min-height: 280px; }
+}
+
+/* ═══════════════════════════════════
+   GLOBAL MOBILE OVERFLOW FIX
+═══════════════════════════════════ */
+.app-layout, .main-content, .page-content {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+img, svg { max-width: 100%; height: auto; }
+.card, .stat-card { max-width: 100%; }
+.table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+table { min-width: max-content; }
+
+/* ═══════════════════════════════════
+   HOLDINGS RESPONSIVE — table vs cards
+═══════════════════════════════════ */
+.holdings-cards-mobile { display: none; }
+.holdings-table-desktop { display: block; }
+
+@media (max-width: 700px) {
+  .holdings-table-desktop { display: none; }
+  .holdings-cards-mobile { display: flex; flex-direction: column; gap: 10px; }
+}
+
+.holding-mobile-card {
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+}
+.holding-mobile-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.holding-mobile-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.holding-mobile-label {
+  font-size: 10px;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+.holding-mobile-value {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text);
+}
