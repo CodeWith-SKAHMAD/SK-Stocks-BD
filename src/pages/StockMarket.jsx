@@ -174,22 +174,15 @@ export default function StockMarket() {
     if (!chartRef.current) return
     chartRef.current.innerHTML = ''
 
-    const symbolMap = {
-      GRAMEENPHONE: 'DSE:GRAMEENPHONE', SQURPHARMA: 'DSE:SQURPHARMA', BERGERPBL: 'DSE:BERGERPBL',
-      BATBC: 'DSE:BATBC', BRACBANK: 'DSE:BRACBANK', DUTCHBANGL: 'DSE:DUTCHBANGL',
-      BXPHARMA: 'DSE:BXPHARMA', RENATA: 'DSE:RENATA', ACI: 'DSE:ACI', ISLAMIBANK: 'DSE:ISLAMIBANK',
-      EBL: 'DSE:EBL', CITYBANK: 'DSE:CITYBANK', BSRMSTEEL: 'DSE:BSRMSTEEL', SUMMITPOWE: 'DSE:SUMMITPOWE',
-      TITASGAS: 'DSE:TITASGAS', IDLC: 'DSE:IDLC', LBFINANCE: 'DSE:LBFINANCE', APEXFOOT: 'DSE:APEXFOOT',
-      PUBALIBANK: 'DSE:PUBALIBANK', UCBL: 'DSE:UCBL', NCCBANK: 'DSE:NCCBANK', BANKASIA: 'DSE:BANKASIA',
-      MERCANBANK: 'DSE:MERCANBANK', DHAKABANK: 'DSE:DHAKABANK', OLYMPICIND: 'DSE:OLYMPICIND',
-      MARICO: 'DSE:MARICO', HEIDELBERG: 'DSE:HEIDELBERG', MICEMENT: 'DSE:MICEMENT',
-      GPHISPAT: 'DSE:GPHISPAT', BSRMLTD: 'DSE:BSRMLTD', IBNSINA: 'DSE:IBNSINA', BEACONPHAR: 'DSE:BEACONPHAR',
-      SOUTHEASTB: 'DSE:SOUTHEASTB', EXIM: 'DSE:EXIM', PREMIERBAN: 'DSE:PREMIERBAN', MUTUALBANK: 'DSE:MUTUALBANK',
-      ONEBANKLTD: 'DSE:ONEBANKLTD', JAMUNABANKL: 'DSE:JAMUNABANKL', SHAHJABANK: 'DSE:SHAHJABANK',
-      FIRSTSBANK: 'DSE:FIRSTSBANK', UNIONBANK: 'DSE:UNIONBANK', GLOBALBANK: 'DSE:GLOBALBANK',
-      AB: 'DSE:AB', IFIC: 'DSE:IFIC', STANDBANKL: 'DSE:STANDBANKL', UTTARABANK: 'DSE:UTTARABANK',
+    // TradingView Bangladesh-এর সঠিক exchange prefix হলো "DSEBD" (DSE নয়), CSE-এর আলাদা ডেটা TradingView-এ নেই
+    // তাই CSE স্টকের জন্যও DSEBD prefix ব্যবহার করি (একই কোম্পানি দুই exchange-এ-ই থাকতে পারে)
+    // কিছু স্টকের TradingView ticker আমাদের কোডের থেকে আলাদা (যেমন GRAMEENPHONE আসলে GP)
+    const tickerOverrides = {
+      GRAMEENPHONE: 'GP',
+      GP: 'GP', // CSE লিস্টের জন্যও
     }
-    const symbol = symbolMap[selected?.code] || `DSE:${selected?.code}`
+    const ticker = tickerOverrides[selected?.code] || selected?.code
+    const symbol = `DSEBD:${ticker}`
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
 
     // TradingView widget — official embed pattern
@@ -386,9 +379,9 @@ export default function StockMarket() {
           </div>
 
           <div style={{ fontSize: 11, color: 'var(--text3)', textAlign: 'center', lineHeight: 1.5 }}>
-            চার্ট TradingView দ্বারা পরিচালিত। অনেক DSE স্টক TradingView-এ এখনো নেই — তাই কিছু স্টকে চার্ট "Symbol not found" দেখাতে পারে।
+            চার্ট TradingView দ্বারা পরিচালিত (DSEBD এক্সচেঞ্জ ডেটা)। কিছু নতুন বা কম পরিচিত স্টক TradingView-এ এখনো যুক্ত হয়নি।
             <br />
-            💡 দাম জানতে Dashboard থেকে "দাম আপডেট" দিয়ে ম্যানুয়ালি দাম দিন।
+            💡 চার্ট না দেখালে Dashboard থেকে "দাম আপডেট" দিয়ে ম্যানুয়ালি দাম দিন।
           </div>
         </div>
       </div>
