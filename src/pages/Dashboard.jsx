@@ -393,7 +393,9 @@ export default function Dashboard({ onNavigate }) {
             </div>
             <button className="btn btn-ghost btn-sm" onClick={() => onNavigate && onNavigate('portfolio')}>সব দেখুন →</button>
           </div>
-          <div className="table-wrap">
+
+          {/* Desktop table */}
+          <div className="table-wrap holdings-table-desktop">
             <table>
               <thead><tr><th>স্টক</th><th>শেয়ার</th><th>গড় ক্রয়মূল্য</th><th>মোট বিনিয়োগ</th><th>বর্তমান মূল্য</th><th>লাভ/ক্ষতি</th></tr></thead>
               <tbody>
@@ -411,6 +413,38 @@ export default function Dashboard({ onNavigate }) {
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="holdings-cards-mobile">
+            {unrealizedData.map(h => (
+              <div key={h.name} className="holding-mobile-card">
+                <div className="holding-mobile-row">
+                  <span style={{ fontWeight: 800, fontSize: 15 }}>{h.name}</span>
+                  <span style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 13 }}>{h.qty} শেয়ার</span>
+                </div>
+                <div className="holding-mobile-grid">
+                  <div>
+                    <div className="holding-mobile-label">গড় ক্রয়মূল্য</div>
+                    <div className="holding-mobile-value">{formatTaka(h.avgPrice)}</div>
+                  </div>
+                  <div>
+                    <div className="holding-mobile-label">মোট বিনিয়োগ</div>
+                    <div className="holding-mobile-value">{formatTaka(h.cost)}</div>
+                  </div>
+                  <div>
+                    <div className="holding-mobile-label">বর্তমান মূল্য</div>
+                    <div className="holding-mobile-value">{h.curValue > 0 ? formatTaka(h.curValue) : '—'}</div>
+                  </div>
+                  <div>
+                    <div className="holding-mobile-label">লাভ/ক্ষতি</div>
+                    <div className="holding-mobile-value" style={{ color: h.unrealized !== null ? (h.unrealized >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--text3)', fontWeight: 800 }}>
+                      {h.unrealized !== null ? `${h.unrealized >= 0 ? '+' : ''}${formatTaka(h.unrealized)}` : '—'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
