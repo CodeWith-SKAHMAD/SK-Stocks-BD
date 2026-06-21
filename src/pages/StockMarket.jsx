@@ -192,24 +192,39 @@ export default function StockMarket() {
     const symbol = symbolMap[selected?.code] || `DSE:${selected?.code}`
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
 
+    // TradingView widget — official embed pattern
     const widgetContainer = document.createElement('div')
     widgetContainer.className = 'tradingview-widget-container'
-    widgetContainer.style.cssText = 'height:100%;width:100%;'
-    const widgetDiv = document.createElement('div')
-    widgetDiv.style.cssText = 'height:calc(100% - 32px);width:100%;'
+    widgetContainer.style.height = '100%'
+    widgetContainer.style.width = '100%'
+
+    const widgetInner = document.createElement('div')
+    widgetInner.className = 'tradingview-widget-container__widget'
+    widgetInner.style.height = '100%'
+    widgetInner.style.width = '100%'
+    widgetContainer.appendChild(widgetInner)
+
+    chartRef.current.appendChild(widgetContainer)
+
     const script = document.createElement('script')
     script.type = 'text/javascript'
     script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js'
     script.async = true
-    script.innerHTML = JSON.stringify({
-      autosize: true, symbol, interval: 'D', timezone: 'Asia/Dhaka',
-      theme: isDark ? 'dark' : 'light', style: '1', locale: 'en',
-      enable_publishing: false, hide_top_toolbar: false, hide_legend: false, save_image: true,
+    script.text = JSON.stringify({
+      autosize: true,
+      symbol,
+      interval: 'D',
+      timezone: 'Asia/Dhaka',
+      theme: isDark ? 'dark' : 'light',
+      style: '1',
+      locale: 'en',
+      enable_publishing: false,
+      hide_top_toolbar: false,
+      hide_legend: false,
+      save_image: true,
       support_host: 'https://www.tradingview.com'
     })
-    widgetContainer.appendChild(widgetDiv)
     widgetContainer.appendChild(script)
-    chartRef.current.appendChild(widgetContainer)
   }
 
   const selectedAlerts = activeAlerts.filter(a => a.code === selected?.code)
@@ -370,8 +385,10 @@ export default function StockMarket() {
             <div ref={chartRef} style={{ width: '100%', height: '100%' }} />
           </div>
 
-          <div style={{ fontSize: 11, color: 'var(--text3)', textAlign: 'center' }}>
-            চার্ট TradingView দ্বারা পরিচালিত • রিয়েল-টাইম DSE ডেটা নাও থাকতে পারে
+          <div style={{ fontSize: 11, color: 'var(--text3)', textAlign: 'center', lineHeight: 1.5 }}>
+            চার্ট TradingView দ্বারা পরিচালিত। অনেক DSE স্টক TradingView-এ এখনো নেই — তাই কিছু স্টকে চার্ট "Symbol not found" দেখাতে পারে।
+            <br />
+            💡 দাম জানতে Dashboard থেকে "দাম আপডেট" দিয়ে ম্যানুয়ালি দাম দিন।
           </div>
         </div>
       </div>
