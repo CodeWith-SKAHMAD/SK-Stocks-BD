@@ -1,108 +1,160 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { DSE_STOCKS, CSE_STOCKS } from '../lib/utils'
-import { Star, StarOff, Search, ExternalLink, Plus, Trash2, FolderOpen, Bell, BellOff, X } from 'lucide-react'
+import { Star, StarOff, Search, ExternalLink, Plus, Trash2, FolderOpen, Bell, X, Edit2 } from 'lucide-react'
 
 export default function StockMarket() {
   const [exchange, setExchange] = useState('DSE')
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(DSE_STOCKS[0])
+  const [customStocks, setCustomStocks] = useState([])
   const [watchlists, setWatchlists] = useState([])
+  const [watchlistStocks, setWatchlistStocks] = useState([])
   const [activeWL, setActiveWL] = useState(null)
   const [view, setView] = useState('all')
   const [showNewWL, setShowNewWL] = useState(false)
   const [newWLName, setNewWLName] = useState('')
-  const [alerts, setAlerts] = useState([]) // [{code, price, type:'above'|'below'}]
   const [showAlertForm, setShowAlertForm] = useState(false)
   const [alertPrice, setAlertPrice] = useState('')
   const [alertType, setAlertType] = useState('above')
   const [activeAlerts, setActiveAlerts] = useState([])
   const [popups, setPopups] = useState([])
+  const [showAddStockModal, setShowAddStockModal] = useState(false)
+  const [editingStock, setEditingStock] = useState(null)
+  const [newStockCode, setNewStockCode] = useState('')
+  const [newStockName, setNewStockName] = useState('')
+  const [newStockSector, setNewStockSector] = useState('')
   const chartRef = useRef(null)
-  const chartKey = useRef(0)
 
-  const stocks = exchange === 'DSE' ? DSE_STOCKS : CSE_STOCKS
-  const filtered = stocks.filter(s =>
+  const builtinStocks = exchange === 'DSE' ? DSE_STOCKS : CSE_STOCKS
+  const customForExchange = customStocks.filter(s => s.exchange === exchange)
+  const allStocks = [...builtinStocks, ...customForExchange]
+
+  const filtered = allStocks.filter(s =>
     s.code.toLowerCase().includes(search.toLowerCase()) ||
     s.name.toLowerCase().includes(search.toLowerCase()) ||
-    s.sector.toLowerCase().includes(search.toLowerCase())
+    (s.sector || '').toLowerCase().includes(search.toLowerCase())
   )
-  const activeWLStocks = activeWL ? (watchlists.find(w => w.id === activeWL)?.stocks || []) : []
-  const displayList = view === 'watchlist' ? filtered.filter(s => activeWLStocks.includes(s.code)) : filtered
 
-  useEffect(() => { fetchWatchlists() }, [])
+  const activeWLStockCodes = activeWL ? watchlistStocks.filter(w => w.watchlist_id === activeWL).map(w => w.stock_name) : []
+  const displayList = view === 'watchlist' ? filtered.filter(s => activeWLStockCodes.includes(s.code)) : filtered
 
   useEffect(() => {
-    // Load alerts from localStorage
+    fetchWatchlists()
+    fetchCustomStocks()
     const saved = localStorage.getItem('bd_stock_alerts')
     if (saved) setActiveAlerts(JSON.parse(saved))
+
+    const channel = supabase
+      .channel('stockmarket-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'watchlists' }, () => fetchWatchlists())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'watchlist' }, () => fetchWatchlists())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'custom_stocks' }, () => fetchCustomStocks())
+      .subscribe()
+    return () => supabase.removeChannel(channel)
   }, [])
 
-  useEffect(() => {
-    if (selected) {
-      chartKey.current += 1
-      loadChart()
-    }
-  }, [selected])
+  useEffect(() => { if (selected) loadChart() }, [selected])
 
   async function fetchWatchlists() {
-    const { data } = await supabase.from('watchlist').select('*').order('created_at')
-    if (!data) return
-    const wlMap = {}
-    data.forEach(w => {
-      const wlName = w.note || 'Default'
-      if (!wlMap[wlName]) wlMap[wlName] = { id: wlName, name: wlName, stocks: [] }
-      wlMap[wlName].stocks.push(w.stock_name)
-    })
-    const wls = Object.values(wlMap)
-    setWatchlists(wls)
-    if (wls.length > 0 && !activeWL) setActiveWL(wls[0].id)
+    const { data: wls } = await supabase.from('watchlists').select('*').order('created_at')
+    const { data: stocks } = await supabase.from('watchlist').select('*')
+    setWatchlists(wls || [])
+    setWatchlistStocks((stocks || []).filter(s => s.watchlist_id).map(s => ({ watchlist_id: s.watchlist_id, stock_name: s.stock_name })))
+    if (wls && wls.length > 0 && !activeWL) setActiveWL(wls[0].id)
   }
 
-  async function addToWatchlist(code) {
-    if (!activeWL) { alert('আগে একটি watchlist বেছে নিন'); return }
-    const wl = watchlists.find(w => w.id === activeWL)
-    if (wl?.stocks.includes(code)) {
-      await supabase.from('watchlist').delete().eq('stock_name', code).eq('note', activeWL)
-    } else {
-      await supabase.from('watchlist').insert({ stock_name: code, exchange, note: activeWL })
-    }
-    fetchWatchlists()
+  async function fetchCustomStocks() {
+    const { data } = await supabase.from('custom_stocks').select('*').order('created_at')
+    setCustomStocks(data || [])
   }
 
   async function createWatchlist() {
     if (!newWLName.trim()) return
-    setWatchlists(prev => [...prev, { id: newWLName, name: newWLName, stocks: [] }])
-    setActiveWL(newWLName)
-    setNewWLName(''); setShowNewWL(false)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data, error } = await supabase.from('watchlists').insert({ user_id: user.id, name: newWLName.trim() }).select().single()
+    if (!error && data) {
+      setActiveWL(data.id)
+      setNewWLName(''); setShowNewWL(false)
+      fetchWatchlists()
+    }
   }
 
   async function deleteWatchlist(wlId) {
-    await supabase.from('watchlist').delete().eq('note', wlId)
-    setWatchlists(prev => prev.filter(w => w.id !== wlId))
-    if (activeWL === wlId) setActiveWL(watchlists[0]?.id || null)
+    if (!confirm('এই Watchlist মুছে ফেলবেন?')) return
+    await supabase.from('watchlists').delete().eq('id', wlId)
+    if (activeWL === wlId) setActiveWL(null)
+    fetchWatchlists()
+  }
+
+  async function toggleInWatchlist(code) {
+    if (!activeWL) { showPopup('আগে একটি Watchlist তৈরি করুন বা বেছে নিন', 'alert'); return }
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const isIn = activeWLStockCodes.includes(code)
+    if (isIn) {
+      await supabase.from('watchlist').delete().eq('watchlist_id', activeWL).eq('stock_name', code)
+    } else {
+      await supabase.from('watchlist').insert({ user_id: user.id, stock_name: code, exchange, watchlist_id: activeWL })
+    }
     fetchWatchlists()
   }
 
   function isInActiveWL(code) {
-    return watchlists.find(w => w.id === activeWL)?.stocks.includes(code) || false
+    return activeWLStockCodes.includes(code)
+  }
+
+  function openAddStock() {
+    setEditingStock(null)
+    setNewStockCode(''); setNewStockName(''); setNewStockSector('')
+    setShowAddStockModal(true)
+  }
+
+  function openEditStock(stock) {
+    setEditingStock(stock)
+    setNewStockCode(stock.code); setNewStockName(stock.name); setNewStockSector(stock.sector || '')
+    setShowAddStockModal(true)
+  }
+
+  async function saveCustomStock() {
+    if (!newStockCode.trim() || !newStockName.trim()) return
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    if (editingStock) {
+      await supabase.from('custom_stocks').update({
+        code: newStockCode.trim().toUpperCase(), name: newStockName.trim(), sector: newStockSector.trim() || 'অন্যান্য'
+      }).eq('id', editingStock.id)
+      showPopup('✅ স্টক আপডেট হয়েছে', 'success')
+    } else {
+      const { error } = await supabase.from('custom_stocks').insert({
+        user_id: user.id, code: newStockCode.trim().toUpperCase(), name: newStockName.trim(),
+        sector: newStockSector.trim() || 'অন্যান্য', exchange
+      })
+      if (error) { showPopup('⚠️ এই কোড আগে থেকেই আছে', 'alert'); return }
+      showPopup('✅ নতুন স্টক যোগ হয়েছে', 'success')
+    }
+    setShowAddStockModal(false)
+    fetchCustomStocks()
+  }
+
+  async function deleteCustomStock(id) {
+    if (!confirm('এই স্টক মুছে ফেলবেন?')) return
+    await supabase.from('custom_stocks').delete().eq('id', id)
+    fetchCustomStocks()
   }
 
   function addAlert() {
     if (!alertPrice || !selected) return
     const newAlert = {
-      id: Date.now(),
-      code: selected.code,
-      name: selected.name,
-      price: Number(alertPrice),
-      type: alertType,
-      createdAt: new Date().toISOString()
+      id: Date.now(), code: selected.code, name: selected.name,
+      price: Number(alertPrice), type: alertType, createdAt: new Date().toISOString()
     }
     const updated = [...activeAlerts, newAlert]
     setActiveAlerts(updated)
     localStorage.setItem('bd_stock_alerts', JSON.stringify(updated))
     setAlertPrice(''); setShowAlertForm(false)
-    // Show confirmation popup
     showPopup(`✅ ${selected.code} এর জন্য ৳${alertPrice} Alert সেট হয়েছে!`, 'success')
   }
 
@@ -122,100 +174,50 @@ export default function StockMarket() {
     if (!chartRef.current) return
     chartRef.current.innerHTML = ''
 
-    // TradingView DSE symbol format
     const symbolMap = {
-      GRAMEENPHONE: 'DSE:GRAMEENPHONE',
-      SQURPHARMA: 'DSE:SQURPHARMA',
-      BERGERPBL: 'DSE:BERGERPBL',
-      BATBC: 'DSE:BATBC',
-      BRACBANK: 'DSE:BRACBANK',
-      DUTCHBANGL: 'DSE:DUTCHBANGL',
-      BXPHARMA: 'DSE:BXPHARMA',
-      RENATA: 'DSE:RENATA',
-      ACI: 'DSE:ACI',
-      ISLAMIBANK: 'DSE:ISLAMIBANK',
-      EBL: 'DSE:EBL',
-      CITYBANK: 'DSE:CITYBANK',
-      BSRMSTEEL: 'DSE:BSRMSTEEL',
-      SUMMITPOWE: 'DSE:SUMMITPOWE',
-      TITASGAS: 'DSE:TITASGAS',
-      IDLC: 'DSE:IDLC',
-      LBFINANCE: 'DSE:LBFINANCE',
-      APEXFOOT: 'DSE:APEXFOOT',
-      PUBALIBANK: 'DSE:PUBALIBANK',
-      UCBL: 'DSE:UCBL',
-      NCCBANK: 'DSE:NCCBANK',
-      BANKASIA: 'DSE:BANKASIA',
-      MERCANBANK: 'DSE:MERCANBANK',
-      DHAKABANK: 'DSE:DHAKABANK',
-      OLYMPICIND: 'DSE:OLYMPICIND',
-      MARICO: 'DSE:MARICO',
-      HEIDELBERG: 'DSE:HEIDELBERG',
-      MICEMENT: 'DSE:MICEMENT',
-      GPHISPAT: 'DSE:GPHISPAT',
-      BSRMLTD: 'DSE:BSRMLTD',
-      IBNSINA: 'DSE:IBNSINA',
-      BEACONPHAR: 'DSE:BEACONPHAR',
-      SOUTHEASTB: 'DSE:SOUTHEASTB',
-      EXIM: 'DSE:EXIM',
-      PREMIERBAN: 'DSE:PREMIERBAN',
-      MUTUALBANK: 'DSE:MUTUALBANK',
-      ONEBANKLTD: 'DSE:ONEBANKLTD',
-      JAMUNABANKL: 'DSE:JAMUNABANKL',
-      SHAHJABANK: 'DSE:SHAHJABANK',
-      FIRSTSBANK: 'DSE:FIRSTSBANK',
-      UNIONBANK: 'DSE:UNIONBANK',
-      GLOBALBANK: 'DSE:GLOBALBANK',
-      AB: 'DSE:AB',
-      IFIC: 'DSE:IFIC',
-      STANDBANKL: 'DSE:STANDBANKL',
-      UTTARABANK: 'DSE:UTTARABANK',
+      GRAMEENPHONE: 'DSE:GRAMEENPHONE', SQURPHARMA: 'DSE:SQURPHARMA', BERGERPBL: 'DSE:BERGERPBL',
+      BATBC: 'DSE:BATBC', BRACBANK: 'DSE:BRACBANK', DUTCHBANGL: 'DSE:DUTCHBANGL',
+      BXPHARMA: 'DSE:BXPHARMA', RENATA: 'DSE:RENATA', ACI: 'DSE:ACI', ISLAMIBANK: 'DSE:ISLAMIBANK',
+      EBL: 'DSE:EBL', CITYBANK: 'DSE:CITYBANK', BSRMSTEEL: 'DSE:BSRMSTEEL', SUMMITPOWE: 'DSE:SUMMITPOWE',
+      TITASGAS: 'DSE:TITASGAS', IDLC: 'DSE:IDLC', LBFINANCE: 'DSE:LBFINANCE', APEXFOOT: 'DSE:APEXFOOT',
+      PUBALIBANK: 'DSE:PUBALIBANK', UCBL: 'DSE:UCBL', NCCBANK: 'DSE:NCCBANK', BANKASIA: 'DSE:BANKASIA',
+      MERCANBANK: 'DSE:MERCANBANK', DHAKABANK: 'DSE:DHAKABANK', OLYMPICIND: 'DSE:OLYMPICIND',
+      MARICO: 'DSE:MARICO', HEIDELBERG: 'DSE:HEIDELBERG', MICEMENT: 'DSE:MICEMENT',
+      GPHISPAT: 'DSE:GPHISPAT', BSRMLTD: 'DSE:BSRMLTD', IBNSINA: 'DSE:IBNSINA', BEACONPHAR: 'DSE:BEACONPHAR',
+      SOUTHEASTB: 'DSE:SOUTHEASTB', EXIM: 'DSE:EXIM', PREMIERBAN: 'DSE:PREMIERBAN', MUTUALBANK: 'DSE:MUTUALBANK',
+      ONEBANKLTD: 'DSE:ONEBANKLTD', JAMUNABANKL: 'DSE:JAMUNABANKL', SHAHJABANK: 'DSE:SHAHJABANK',
+      FIRSTSBANK: 'DSE:FIRSTSBANK', UNIONBANK: 'DSE:UNIONBANK', GLOBALBANK: 'DSE:GLOBALBANK',
+      AB: 'DSE:AB', IFIC: 'DSE:IFIC', STANDBANKL: 'DSE:STANDBANKL', UTTARABANK: 'DSE:UTTARABANK',
     }
-
     const symbol = symbolMap[selected?.code] || `DSE:${selected?.code}`
-    const isDark = document.documentElement.getAttribute('data-theme') !== 'light'
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
 
     const widgetContainer = document.createElement('div')
     widgetContainer.className = 'tradingview-widget-container'
     widgetContainer.style.cssText = 'height:100%;width:100%;'
-
     const widgetDiv = document.createElement('div')
-    widgetDiv.className = 'tradingview-widget-container__widget'
     widgetDiv.style.cssText = 'height:calc(100% - 32px);width:100%;'
-
     const script = document.createElement('script')
     script.type = 'text/javascript'
     script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js'
     script.async = true
     script.innerHTML = JSON.stringify({
-      autosize: true,
-      symbol,
-      interval: 'D',
-      timezone: 'Asia/Dhaka',
-      theme: isDark ? 'dark' : 'light',
-      style: '1',
-      locale: 'en',
-      backgroundColor: isDark ? 'rgba(13,19,33,1)' : 'rgba(255,255,255,1)',
-      gridColor: isDark ? 'rgba(30,45,71,1)' : 'rgba(221,229,245,1)',
-      enable_publishing: false,
-      hide_top_toolbar: false,
-      hide_legend: false,
-      save_image: true,
-      hide_volume: false,
+      autosize: true, symbol, interval: 'D', timezone: 'Asia/Dhaka',
+      theme: isDark ? 'dark' : 'light', style: '1', locale: 'en',
+      enable_publishing: false, hide_top_toolbar: false, hide_legend: false, save_image: true,
       support_host: 'https://www.tradingview.com'
     })
-
     widgetContainer.appendChild(widgetDiv)
     widgetContainer.appendChild(script)
     chartRef.current.appendChild(widgetContainer)
   }
 
   const selectedAlerts = activeAlerts.filter(a => a.code === selected?.code)
+  const isCustomStock = customStocks.some(s => s.code === selected?.code)
 
   return (
-    <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 14, height: 'calc(100vh - 76px)' }}>
+    <div className="fade-up stock-market-page">
 
-      {/* Alert Popups */}
       <div style={{ position: 'fixed', top: 80, right: 20, zIndex: 9999, display: 'flex', flexDirection: 'column', gap: 10 }}>
         {popups.map(p => (
           <div key={p.id} style={{
@@ -223,15 +225,12 @@ export default function StockMarket() {
             color: '#fff', padding: '12px 18px', borderRadius: 10, fontSize: 13.5,
             fontWeight: 600, boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
             animation: 'fadeUp 0.3s ease', display: 'flex', alignItems: 'center', gap: 8, maxWidth: 300
-          }}>
-            {p.msg}
-          </div>
+          }}>{p.msg}</div>
         ))}
       </div>
 
-      <div style={{ display: 'flex', gap: 14, flex: 1, minHeight: 0 }}>
-        {/* Left Panel */}
-        <div style={{ width: 270, display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0, overflowY: 'auto' }}>
+      <div className="stock-market-layout">
+        <div className="stock-market-sidebar">
           <div className="tabs" style={{ marginBottom: 0 }}>
             <button className={`tab ${exchange === 'DSE' ? 'active' : ''}`} onClick={() => setExchange('DSE')}>DSE</button>
             <button className={`tab ${exchange === 'CSE' ? 'active' : ''}`} onClick={() => setExchange('CSE')}>CSE</button>
@@ -247,14 +246,17 @@ export default function StockMarket() {
               <div style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>আমার Watchlist</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 130, overflowY: 'auto' }}>
                 {watchlists.length === 0 && <div style={{ fontSize: 12, color: 'var(--text3)', padding: '4px 0' }}>কোনো watchlist নেই</div>}
-                {watchlists.map(wl => (
-                  <div key={wl.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 8px', borderRadius: 6, background: activeWL === wl.id ? 'rgba(0,229,180,0.1)' : 'var(--bg3)', border: `1px solid ${activeWL === wl.id ? 'rgba(0,229,180,0.25)' : 'var(--border)'}`, cursor: 'pointer' }} onClick={() => setActiveWL(wl.id)}>
-                    <span style={{ fontSize: 12.5, fontWeight: 600, color: activeWL === wl.id ? 'var(--accent)' : 'var(--text2)' }}>
-                      <FolderOpen size={11} style={{ display: 'inline', marginRight: 4 }} />{wl.name} ({wl.stocks.length})
-                    </span>
-                    <button onClick={e => { e.stopPropagation(); deleteWatchlist(wl.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', padding: 2 }}><Trash2 size={10} /></button>
-                  </div>
-                ))}
+                {watchlists.map(wl => {
+                  const count = watchlistStocks.filter(w => w.watchlist_id === wl.id).length
+                  return (
+                    <div key={wl.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 8px', borderRadius: 6, background: activeWL === wl.id ? 'var(--glow-g)' : 'var(--glass)', border: `1px solid ${activeWL === wl.id ? 'var(--accent)' : 'var(--border)'}`, cursor: 'pointer' }} onClick={() => setActiveWL(wl.id)}>
+                      <span style={{ fontSize: 12.5, fontWeight: 600, color: activeWL === wl.id ? 'var(--accent)' : 'var(--text2)' }}>
+                        <FolderOpen size={11} style={{ display: 'inline', marginRight: 4 }} />{wl.name} ({count})
+                      </span>
+                      <button onClick={e => { e.stopPropagation(); deleteWatchlist(wl.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', padding: 2 }}><Trash2 size={10} /></button>
+                    </div>
+                  )
+                })}
               </div>
               {showNewWL ? (
                 <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
@@ -274,44 +276,45 @@ export default function StockMarket() {
             <input placeholder="স্টক বা সেক্টর খুঁজুন..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
 
-          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 5 }}>
+          <button className="btn btn-ghost btn-sm btn-full" onClick={openAddStock}>
+            <Plus size={12} /> নতুন স্টক যোগ করুন
+          </button>
+
+          <div className="stock-list-scroll">
             {displayList.length === 0 ? (
               <div className="empty" style={{ padding: 20 }}><p style={{ fontSize: 12 }}>কোনো স্টক পাওয়া যায়নি।</p></div>
-            ) : displayList.map(s => (
-              <div key={s.code} className="stock-row"
-                style={{ borderColor: selected?.code === s.code ? 'var(--accent)' : '', background: selected?.code === s.code ? 'var(--card2)' : '' }}
-                onClick={() => setSelected(s)}>
-                <div style={{ flex: 1 }}>
-                  <div className="stock-name">{s.code}</div>
-                  <div className="stock-code">{s.name} · {s.sector}</div>
+            ) : displayList.map(s => {
+              const isCustom = customStocks.some(c => c.id === s.id)
+              return (
+                <div key={s.code + (s.id || '')} className="stock-row" style={{ borderColor: selected?.code === s.code ? 'var(--accent)' : '', background: selected?.code === s.code ? 'var(--glass2)' : '' }} onClick={() => setSelected(s)}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="stock-name">{s.code} {isCustom && <span style={{ fontSize: 9, color: 'var(--accent2)', fontWeight: 600 }}>(কাস্টম)</span>}</div>
+                    <div className="stock-code">{s.name} · {s.sector}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+                    {isCustom && (
+                      <button style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--text3)' }} onClick={e => { e.stopPropagation(); openEditStock(s) }}>
+                        <Edit2 size={12} />
+                      </button>
+                    )}
+                    <button style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: isInActiveWL(s.code) ? 'var(--yellow)' : 'var(--text3)' }} onClick={e => { e.stopPropagation(); toggleInWatchlist(s.code) }}>
+                      {isInActiveWL(s.code) ? <Star size={13} fill="currentColor" /> : <StarOff size={13} />}
+                    </button>
+                  </div>
                 </div>
-                {view === 'watchlist' && (
-                  <button style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 3, color: isInActiveWL(s.code) ? 'var(--yellow)' : 'var(--text3)' }}
-                    onClick={e => { e.stopPropagation(); addToWatchlist(s.code) }}>
-                    {isInActiveWL(s.code) ? <Star size={12} fill="currentColor" /> : <StarOff size={12} />}
-                  </button>
-                )}
-                {view === 'all' && (
-                  <button style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 3, color: isInActiveWL(s.code) ? 'var(--yellow)' : 'var(--text3)' }}
-                    onClick={e => { e.stopPropagation(); addToWatchlist(s.code) }}>
-                    {isInActiveWL(s.code) ? <Star size={12} fill="currentColor" /> : <StarOff size={12} />}
-                  </button>
-                )}
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
 
-        {/* Right: Chart + Alert */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 }}>
-          {/* Stock Header */}
+        <div className="stock-market-chart-area">
           {selected && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
               <div>
                 <h3 style={{ fontSize: 17, fontWeight: 800, letterSpacing: '-0.4px' }}>{selected.code}</h3>
                 <p style={{ color: 'var(--text2)', fontSize: 12.5 }}>{selected.name} · {selected.sector}</p>
               </div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 {selectedAlerts.length > 0 && (
                   <span style={{ fontSize: 11.5, color: 'var(--yellow)', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)', padding: '3px 8px', borderRadius: 20, fontWeight: 600 }}>
                     🔔 {selectedAlerts.length}টি Alert
@@ -320,6 +323,11 @@ export default function StockMarket() {
                 <button className="btn btn-ghost btn-sm" onClick={() => setShowAlertForm(!showAlertForm)}>
                   <Bell size={12} /> Price Alert
                 </button>
+                {isCustomStock && (
+                  <button className="btn btn-ghost btn-sm" onClick={() => openEditStock(selected)}>
+                    <Edit2 size={11} /> সম্পাদনা
+                  </button>
+                )}
                 <a href={`https://www.dsebd.org/displayCompany.php?name=${selected.code}`} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm">
                   <ExternalLink size={11} /> DSE
                 </a>
@@ -327,37 +335,29 @@ export default function StockMarket() {
             </div>
           )}
 
-          {/* Alert Form */}
           {showAlertForm && (
             <div className="card" style={{ padding: 14 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: 'var(--text)' }}>🔔 {selected?.code} এর জন্য Price Alert</div>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>🔔 {selected?.code} এর জন্য Price Alert</div>
               <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
                 <div style={{ flex: 1, minWidth: 140 }}>
                   <label className="form-label">Alert ধরন</label>
                   <div style={{ display: 'flex', gap: 6 }}>
-                    <button className={`btn btn-sm ${alertType === 'above' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setAlertType('above')}>📈 উপরে গেলে</button>
-                    <button className={`btn btn-sm ${alertType === 'below' ? 'btn-sell' : 'btn-ghost'}`} style={alertType === 'below' ? { background: 'var(--red)', color: '#fff' } : {}} onClick={() => setAlertType('below')}>📉 নিচে গেলে</button>
+                    <button className={`btn btn-sm ${alertType === 'above' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setAlertType('above')}>📈 উপরে</button>
+                    <button className={`btn btn-sm ${alertType === 'below' ? '' : 'btn-ghost'}`} style={alertType === 'below' ? { background: 'var(--red)', color: '#fff' } : {}} onClick={() => setAlertType('below')}>📉 নিচে</button>
                   </div>
                 </div>
                 <div style={{ flex: 1, minWidth: 120 }}>
                   <label className="form-label">দাম (৳)</label>
-                  <input className="form-input" type="number" placeholder="যেমন: 380" value={alertPrice} onChange={e => setAlertPrice(e.target.value)} />
+                  <input className="form-input" type="number" placeholder="380" value={alertPrice} onChange={e => setAlertPrice(e.target.value)} />
                 </div>
-                <button className="btn btn-primary" onClick={addAlert} disabled={!alertPrice}>
-                  <Bell size={13} /> Alert যোগ করুন
-                </button>
+                <button className="btn btn-primary" onClick={addAlert} disabled={!alertPrice}><Bell size={13} /> যোগ করুন</button>
                 <button className="btn btn-ghost btn-sm" onClick={() => setShowAlertForm(false)}><X size={14} /></button>
               </div>
-
-              {/* Active Alerts for this stock */}
               {selectedAlerts.length > 0 && (
                 <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
-                  <div style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>সক্রিয় Alert</div>
                   {selectedAlerts.map(a => (
-                    <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: 'var(--bg3)', borderRadius: 6, marginBottom: 5 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600 }}>
-                        {a.type === 'above' ? '📈' : '📉'} ৳{a.price} {a.type === 'above' ? 'এর উপরে' : 'এর নিচে'}
-                      </span>
+                    <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: 'var(--glass)', borderRadius: 6, marginBottom: 5 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600 }}>{a.type === 'above' ? '📈' : '📉'} ৳{a.price} {a.type === 'above' ? 'এর উপরে' : 'এর নিচে'}</span>
                       <button onClick={() => deleteAlert(a.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red)' }}><X size={13} /></button>
                     </div>
                   ))}
@@ -366,21 +366,7 @@ export default function StockMarket() {
             </div>
           )}
 
-          {/* All Alerts Summary */}
-          {activeAlerts.length > 0 && !showAlertForm && (
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {activeAlerts.slice(0, 4).map(a => (
-                <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 20, fontSize: 12, fontWeight: 600, color: 'var(--yellow)' }}>
-                  🔔 {a.code} {a.type === 'above' ? '↑' : '↓'} ৳{a.price}
-                  <button onClick={() => deleteAlert(a.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', padding: 0, lineHeight: 1 }}><X size={10} /></button>
-                </div>
-              ))}
-              {activeAlerts.length > 4 && <span style={{ fontSize: 12, color: 'var(--text3)', padding: '4px 0' }}>+{activeAlerts.length - 4} আরো</span>}
-            </div>
-          )}
-
-          {/* TradingView Chart */}
-          <div style={{ flex: 1, minHeight: 380, background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
+          <div className="stock-chart-box">
             <div ref={chartRef} style={{ width: '100%', height: '100%' }} />
           </div>
 
@@ -389,6 +375,44 @@ export default function StockMarket() {
           </div>
         </div>
       </div>
+
+      {showAddStockModal && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowAddStockModal(false)}>
+          <div className="modal">
+            <div className="modal-header">
+              <h3 style={{ fontSize: 17, fontWeight: 800 }}>{editingStock ? '✏️ স্টক সম্পাদনা' : '➕ নতুন স্টক যোগ করুন'}</h3>
+              <button className="icon-btn" onClick={() => setShowAddStockModal(false)}><X size={16} /></button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label className="form-label">এক্সচেঞ্জ</label>
+                <div style={{ padding: '8px 12px', background: 'var(--glass)', borderRadius: 8, fontWeight: 700, fontSize: 13 }}>{exchange}</div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">স্টক কোড</label>
+                <input className="form-input" placeholder="যেমন: NEWSTOCK" value={newStockCode} onChange={e => setNewStockCode(e.target.value.toUpperCase())} disabled={!!editingStock} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">কোম্পানির নাম</label>
+                <input className="form-input" placeholder="যেমন: New Company Ltd" value={newStockName} onChange={e => setNewStockName(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">সেক্টর</label>
+                <input className="form-input" placeholder="যেমন: Banking, Pharma..." value={newStockSector} onChange={e => setNewStockSector(e.target.value)} />
+              </div>
+              {editingStock && (
+                <button className="btn btn-danger btn-sm btn-full" onClick={() => { deleteCustomStock(editingStock.id); setShowAddStockModal(false) }}>
+                  <Trash2 size={12} /> এই স্টক মুছে ফেলুন
+                </button>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-ghost" onClick={() => setShowAddStockModal(false)}>বাতিল</button>
+              <button className="btn btn-primary" onClick={saveCustomStock}>✅ সংরক্ষণ করুন</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
