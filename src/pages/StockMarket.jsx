@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { DSE_STOCKS, CSE_STOCKS } from '../lib/utils'
 import { Star, StarOff, Search, ExternalLink, Plus, Trash2, FolderOpen, Bell, X, Edit2 } from 'lucide-react'
+import StockIcon from '../components/StockIcon'
 
 export default function StockMarket() {
   const [exchange, setExchange] = useState('DSE')
@@ -295,7 +296,8 @@ export default function StockMarket() {
             ) : displayList.map(s => {
               const isCustom = customStocks.some(c => c.id === s.id)
               return (
-                <div key={s.code + (s.id || '')} className="stock-row" style={{ borderColor: selected?.code === s.code ? 'var(--accent)' : '', background: selected?.code === s.code ? 'var(--glass2)' : '' }} onClick={() => setSelected(s)}>
+                <div key={s.code + (s.id || '')} className="stock-row" style={{ borderColor: selected?.code === s.code ? 'var(--accent)' : '', background: selected?.code === s.code ? 'var(--glass2)' : '', gap: 10 }} onClick={() => setSelected(s)}>
+                  <StockIcon code={s.code} sector={s.sector} size={30} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div className="stock-name">{s.code} {isCustom && <span style={{ fontSize: 9, color: 'var(--accent2)', fontWeight: 600 }}>(কাস্টম)</span>}</div>
                     <div className="stock-code">{s.name} · {s.sector}</div>
@@ -319,9 +321,12 @@ export default function StockMarket() {
         <div className="stock-market-chart-area">
           {selected && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-              <div>
-                <h3 style={{ fontSize: 17, fontWeight: 800, letterSpacing: '-0.4px' }}>{selected.code}</h3>
-                <p style={{ color: 'var(--text2)', fontSize: 12.5 }}>{selected.name} · {selected.sector}</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <StockIcon code={selected.code} sector={selected.sector} size={40} />
+                <div>
+                  <h3 style={{ fontSize: 17, fontWeight: 800, letterSpacing: '-0.4px' }}>{selected.code}</h3>
+                  <p style={{ color: 'var(--text2)', fontSize: 12.5 }}>{selected.name} · {selected.sector}</p>
+                </div>
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 {selectedAlerts.length > 0 && (

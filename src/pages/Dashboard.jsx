@@ -9,6 +9,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, 
 import AddTransactionModal from '../components/AddTransactionModal'
 import CurrentPriceModal from '../components/CurrentPriceModal'
 import LedgerEntryModal from '../components/LedgerEntryModal'
+import StockIcon from '../components/StockIcon'
 
 const COLORS = ['#ff7a45', '#6366f1', '#22c55e', '#f5a524', '#ec4899', '#06b6d4']
 
@@ -401,7 +402,12 @@ export default function Dashboard({ onNavigate }) {
               <tbody>
                 {unrealizedData.map(h => (
                   <tr key={h.name}>
-                    <td style={{ fontWeight: 700, fontSize: 14 }}>{h.name}</td>
+                    <td style={{ fontWeight: 700, fontSize: 14 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <StockIcon code={h.name} size={24} />
+                        {h.name}
+                      </div>
+                    </td>
                     <td style={{ color: 'var(--accent)', fontWeight: 700 }}>{h.qty}</td>
                     <td>{formatTaka(h.avgPrice)}</td>
                     <td style={{ fontWeight: 600 }}>{formatTaka(h.cost)}</td>
@@ -420,7 +426,10 @@ export default function Dashboard({ onNavigate }) {
             {unrealizedData.map(h => (
               <div key={h.name} className="holding-mobile-card">
                 <div className="holding-mobile-row">
-                  <span style={{ fontWeight: 800, fontSize: 15 }}>{h.name}</span>
+                  <span style={{ fontWeight: 800, fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <StockIcon code={h.name} size={24} />
+                    {h.name}
+                  </span>
                   <span style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 13 }}>{h.qty} শেয়ার</span>
                 </div>
                 <div className="holding-mobile-grid">
