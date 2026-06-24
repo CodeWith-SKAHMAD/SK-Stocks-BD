@@ -2,6 +2,7 @@
 // নিশ্চিত হওয়া ডোমেইন শুধু এখানে রাখা হয়েছে, না থাকলে sector emoji fallback দেখাবে
 export const STOCK_DOMAINS = {
   GRAMEENPHONE: 'grameenphone.com',
+  ROBI: 'robi.com.bd',
   SQURPHARMA: 'squarepharma.com.bd',
   BRACBANK: 'bracbank.com',
   BATBC: 'batbangladesh.com',
