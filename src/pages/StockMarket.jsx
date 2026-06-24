@@ -9,6 +9,7 @@ export default function StockMarket() {
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(DSE_STOCKS[0])
   const [customStocks, setCustomStocks] = useState([])
+  const [domainOverrides, setDomainOverrides] = useState({})
   const [watchlists, setWatchlists] = useState([])
   const [watchlistStocks, setWatchlistStocks] = useState([])
   const [activeWL, setActiveWL] = useState(null)
@@ -25,6 +26,7 @@ export default function StockMarket() {
   const [newStockCode, setNewStockCode] = useState('')
   const [newStockName, setNewStockName] = useState('')
   const [newStockSector, setNewStockSector] = useState('')
+  const [newStockDomain, setNewStockDomain] = useState('')
   const [chartSource, setChartSource] = useState('tradingview')
   const chartRef = useRef(null)
 
@@ -44,6 +46,7 @@ export default function StockMarket() {
   useEffect(() => {
     fetchWatchlists()
     fetchCustomStocks()
+    fetchDomainOverrides()
     const saved = localStorage.getItem('bd_stock_alerts')
     if (saved) setActiveAlerts(JSON.parse(saved))
 
@@ -52,6 +55,7 @@ export default function StockMarket() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'watchlists' }, () => fetchWatchlists())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'watchlist' }, () => fetchWatchlists())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'custom_stocks' }, () => fetchCustomStocks())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_domain_overrides' }, () => fetchDomainOverrides())
       .subscribe()
     return () => supabase.removeChannel(channel)
   }, [])
@@ -69,6 +73,22 @@ export default function StockMarket() {
   async function fetchCustomStocks() {
     const { data } = await supabase.from('custom_stocks').select('*').order('created_at')
     setCustomStocks(data || [])
+  }
+
+  async function fetchDomainOverrides() {
+    const { data } = await supabase.from('stock_domain_overrides').select('*')
+    const map = {}
+    ;(data || []).forEach(d => { map[d.stock_code] = d.domain })
+    setDomainOverrides(map)
+  }
+
+  async function saveDomainOverride(code, domain) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user || !domain.trim()) return
+    await supabase.from('stock_domain_overrides').upsert({
+      user_id: user.id, stock_code: code, domain: domain.trim().replace(/^https?:\/\//, '').replace(/\/$/, '')
+    }, { onConflict: 'user_id,stock_code' })
+    fetchDomainOverrides()
   }
 
   async function createWatchlist() {
@@ -109,13 +129,22 @@ export default function StockMarket() {
 
   function openAddStock() {
     setEditingStock(null)
-    setNewStockCode(''); setNewStockName(''); setNewStockSector('')
+    setNewStockCode(''); setNewStockName(''); setNewStockSector(''); setNewStockDomain('')
     setShowAddStockModal(true)
   }
 
   function openEditStock(stock) {
     setEditingStock(stock)
     setNewStockCode(stock.code); setNewStockName(stock.name); setNewStockSector(stock.sector || '')
+    setNewStockDomain(domainOverrides[stock.code] || '')
+    setShowAddStockModal(true)
+  }
+
+  // যেকোনো স্টকের (built-in বা custom) জন্য শুধু logo domain সেট করতে — নাম/সেক্টর পরিবর্তন করা যাবে না
+  function openLogoOnlyEdit(stock) {
+    setEditingStock({ ...stock, logoOnly: true })
+    setNewStockCode(stock.code); setNewStockName(stock.name); setNewStockSector(stock.sector || '')
+    setNewStockDomain(domainOverrides[stock.code] || '')
     setShowAddStockModal(true)
   }
 
@@ -123,6 +152,18 @@ export default function StockMarket() {
     if (!newStockCode.trim() || !newStockName.trim()) return
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
+
+    // লোগো ডোমেইন — built-in স্টকেও কাজ করবে
+    if (newStockDomain.trim()) {
+      await saveDomainOverride(newStockCode.trim().toUpperCase(), newStockDomain)
+    }
+
+    // built-in স্টকের জন্য শুধু লোগো আপডেট হলে, custom_stocks টেবিলে কিছু লেখার দরকার নেই
+    if (editingStock?.logoOnly) {
+      setShowAddStockModal(false)
+      showPopup('✅ লোগো আপডেট হয়েছে', 'success')
+      return
+    }
 
     if (editingStock) {
       await supabase.from('custom_stocks').update({
@@ -297,14 +338,18 @@ export default function StockMarket() {
               const isCustom = customStocks.some(c => c.id === s.id)
               return (
                 <div key={s.code + (s.id || '')} className="stock-row" style={{ borderColor: selected?.code === s.code ? 'var(--accent)' : '', background: selected?.code === s.code ? 'var(--glass2)' : '', gap: 10 }} onClick={() => setSelected(s)}>
-                  <StockIcon code={s.code} sector={s.sector} size={30} />
+                  <StockIcon code={s.code} sector={s.sector} size={30} domainOverride={domainOverrides[s.code]} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div className="stock-name">{s.code} {isCustom && <span style={{ fontSize: 9, color: 'var(--accent2)', fontWeight: 600 }}>(কাস্টম)</span>}</div>
                     <div className="stock-code">{s.name} · {s.sector}</div>
                   </div>
                   <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
-                    {isCustom && (
+                    {isCustom ? (
                       <button style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--text3)' }} onClick={e => { e.stopPropagation(); openEditStock(s) }}>
+                        <Edit2 size={12} />
+                      </button>
+                    ) : (
+                      <button style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--text3)' }} title="লোগো সেট করুন" onClick={e => { e.stopPropagation(); openLogoOnlyEdit(s) }}>
                         <Edit2 size={12} />
                       </button>
                     )}
@@ -322,7 +367,7 @@ export default function StockMarket() {
           {selected && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <StockIcon code={selected.code} sector={selected.sector} size={40} />
+                <StockIcon code={selected.code} sector={selected.sector} size={40} domainOverride={domainOverrides[selected.code]} />
                 <div>
                   <h3 style={{ fontSize: 17, fontWeight: 800, letterSpacing: '-0.4px' }}>{selected.code}</h3>
                   <p style={{ color: 'var(--text2)', fontSize: 12.5 }}>{selected.name} · {selected.sector}</p>
@@ -337,9 +382,13 @@ export default function StockMarket() {
                 <button className="btn btn-ghost btn-sm" onClick={() => setShowAlertForm(!showAlertForm)}>
                   <Bell size={12} /> Price Alert
                 </button>
-                {isCustomStock && (
+                {isCustomStock ? (
                   <button className="btn btn-ghost btn-sm" onClick={() => openEditStock(selected)}>
                     <Edit2 size={11} /> সম্পাদনা
+                  </button>
+                ) : (
+                  <button className="btn btn-ghost btn-sm" onClick={() => openLogoOnlyEdit(selected)}>
+                    <Edit2 size={11} /> লোগো সেট করুন
                   </button>
                 )}
                 <a href={`https://www.dsebd.org/displayCompany.php?name=${selected.code}`} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm">
@@ -428,27 +477,52 @@ export default function StockMarket() {
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowAddStockModal(false)}>
           <div className="modal">
             <div className="modal-header">
-              <h3 style={{ fontSize: 17, fontWeight: 800 }}>{editingStock ? '✏️ স্টক সম্পাদনা' : '➕ নতুন স্টক যোগ করুন'}</h3>
+              <h3 style={{ fontSize: 17, fontWeight: 800 }}>
+                {editingStock?.logoOnly ? '🖼️ লোগো সেট করুন' : editingStock ? '✏️ স্টক সম্পাদনা' : '➕ নতুন স্টক যোগ করুন'}
+              </h3>
               <button className="icon-btn" onClick={() => setShowAddStockModal(false)}><X size={16} /></button>
             </div>
             <div className="modal-body">
+              {editingStock?.logoOnly && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, padding: 12, background: 'var(--glass)', borderRadius: 10 }}>
+                  <StockIcon code={newStockCode} sector={newStockSector} domainOverride={newStockDomain || domainOverrides[newStockCode]} size={36} />
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>{newStockCode}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text2)' }}>{newStockName}</div>
+                  </div>
+                </div>
+              )}
+
+              {!editingStock?.logoOnly && (
+                <>
+                  <div className="form-group">
+                    <label className="form-label">এক্সচেঞ্জ</label>
+                    <div style={{ padding: '8px 12px', background: 'var(--glass)', borderRadius: 8, fontWeight: 700, fontSize: 13 }}>{exchange}</div>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">স্টক কোড</label>
+                    <input className="form-input" placeholder="যেমন: NEWSTOCK" value={newStockCode} onChange={e => setNewStockCode(e.target.value.toUpperCase())} disabled={!!editingStock} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">কোম্পানির নাম</label>
+                    <input className="form-input" placeholder="যেমন: New Company Ltd" value={newStockName} onChange={e => setNewStockName(e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">সেক্টর</label>
+                    <input className="form-input" placeholder="যেমন: Banking, Pharma..." value={newStockSector} onChange={e => setNewStockSector(e.target.value)} />
+                  </div>
+                </>
+              )}
+
               <div className="form-group">
-                <label className="form-label">এক্সচেঞ্জ</label>
-                <div style={{ padding: '8px 12px', background: 'var(--glass)', borderRadius: 8, fontWeight: 700, fontSize: 13 }}>{exchange}</div>
+                <label className="form-label">কোম্পানির ওয়েবসাইট ডোমেইন (লোগোর জন্য, ঐচ্ছিক)</label>
+                <input className="form-input" placeholder="যেমন: robi.com.bd" value={newStockDomain} onChange={e => setNewStockDomain(e.target.value)} />
+                <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 5 }}>
+                  কোম্পানির ওয়েবসাইট দিলে সেখান থেকে favicon (লোগো) দেখাবে। https:// লেখার দরকার নেই।
+                </div>
               </div>
-              <div className="form-group">
-                <label className="form-label">স্টক কোড</label>
-                <input className="form-input" placeholder="যেমন: NEWSTOCK" value={newStockCode} onChange={e => setNewStockCode(e.target.value.toUpperCase())} disabled={!!editingStock} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">কোম্পানির নাম</label>
-                <input className="form-input" placeholder="যেমন: New Company Ltd" value={newStockName} onChange={e => setNewStockName(e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">সেক্টর</label>
-                <input className="form-input" placeholder="যেমন: Banking, Pharma..." value={newStockSector} onChange={e => setNewStockSector(e.target.value)} />
-              </div>
-              {editingStock && (
+
+              {editingStock && !editingStock.logoOnly && (
                 <button className="btn btn-danger btn-sm btn-full" onClick={() => { deleteCustomStock(editingStock.id); setShowAddStockModal(false) }}>
                   <Trash2 size={12} /> এই স্টক মুছে ফেলুন
                 </button>

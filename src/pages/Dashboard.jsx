@@ -58,6 +58,7 @@ export default function Dashboard({ onNavigate }) {
   const [chartPeriod, setChartPeriod] = useState('30d')
   const [currentPrices, setCurrentPrices] = useState({})
   const [ledgerBalance, setLedgerBalance] = useState(0)
+  const [domainOverrides, setDomainOverrides] = useState({})
   const [hideBalance, setHideBalance] = useState(() => localStorage.getItem('bd_hide_balance') === 'true')
   const market = getMarketStatus()
 
@@ -65,6 +66,7 @@ export default function Dashboard({ onNavigate }) {
     fetchTransactions()
     fetchPrices()
     fetchLedger()
+    fetchDomainOverrides()
     const channel = supabase
       .channel('dashboard-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => fetchTransactions())
@@ -77,6 +79,13 @@ export default function Dashboard({ onNavigate }) {
   async function fetchLedger() {
     const { data } = await supabase.from('ledger').select('type, amount')
     setLedgerBalance(calcLedgerBalance(data || []))
+  }
+
+  async function fetchDomainOverrides() {
+    const { data } = await supabase.from('stock_domain_overrides').select('*')
+    const map = {}
+    ;(data || []).forEach(d => { map[d.stock_code] = d.domain })
+    setDomainOverrides(map)
   }
 
   async function fetchTransactions() {
@@ -404,7 +413,7 @@ export default function Dashboard({ onNavigate }) {
                   <tr key={h.name}>
                     <td style={{ fontWeight: 700, fontSize: 14 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <StockIcon code={h.name} size={24} />
+                        <StockIcon code={h.name} size={24} domainOverride={domainOverrides[h.name]} />
                         {h.name}
                       </div>
                     </td>
@@ -427,7 +436,7 @@ export default function Dashboard({ onNavigate }) {
               <div key={h.name} className="holding-mobile-card">
                 <div className="holding-mobile-row">
                   <span style={{ fontWeight: 800, fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <StockIcon code={h.name} size={24} />
+                    <StockIcon code={h.name} size={24} domainOverride={domainOverrides[h.name]} />
                     {h.name}
                   </span>
                   <span style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 13 }}>{h.qty} শেয়ার</span>
