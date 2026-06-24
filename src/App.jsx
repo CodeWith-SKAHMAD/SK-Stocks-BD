@@ -179,8 +179,14 @@ function AppInner() {
             <span className="topbar-title">{PAGE_TITLES[page]}</span>
           </div>
           <div className="topbar-right">
-            <button className="icon-btn" onClick={toggleTheme} title={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}>
-              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            <button className="theme-switch" onClick={toggleTheme} title={theme === 'dark' ? 'Light Mode' : 'Dark Mode'} aria-label="Toggle theme">
+              <span className="theme-switch-track">
+                <Sun size={12} className="theme-switch-icon sun" />
+                <Moon size={12} className="theme-switch-icon moon" />
+              </span>
+              <span className={`theme-switch-thumb ${theme === 'dark' ? 'dark' : 'light'}`}>
+                {theme === 'dark' ? <Moon size={13} /> : <Sun size={13} />}
+              </span>
             </button>
             <button
               className="avatar-btn"
