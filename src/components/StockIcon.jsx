@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { getStockFaviconUrl, getSectorEmoji } from '../lib/stockDomains'
 
-export default function StockIcon({ code, sector, size = 28 }) {
+export default function StockIcon({ code, sector, size = 28, domainOverride = null }) {
   const [failed, setFailed] = useState(false)
-  const faviconUrl = getStockFaviconUrl(code)
+  const faviconUrl = domainOverride
+    ? `https://www.google.com/s2/favicons?sz=64&domain=${domainOverride}`
+    : getStockFaviconUrl(code)
 
   if (!faviconUrl || failed) {
     return (
